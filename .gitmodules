@@ -1,0 +1,4 @@
+[submodule "third-party/The-Forge"]
+	path = third-party/The-Forge
+	url = ../../ConfettiFX/The-Forge.git
+	branch = master
