@@ -1,0 +1,94 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.35325.158
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Demo", "Demo.vcxproj", "{85FA96DD-AD94-4462-AFF9-524FDDB4603C}"
+	ProjectSection(ProjectDependencies) = postProject
+		{0D2A392A-A59C-425E-ACD8-2FE1682346A8} = {0D2A392A-A59C-425E-ACD8-2FE1682346A8}
+		{30DD3D57-0026-48C8-BFD1-6392F319E23A} = {30DD3D57-0026-48C8-BFD1-6392F319E23A}
+		{F3C4507C-E714-4773-AF45-5FA9FB0BB4AF} = {F3C4507C-E714-4773-AF45-5FA9FB0BB4AF}
+		{DB6193E0-3C12-450F-B344-DC4DAED8C421} = {DB6193E0-3C12-450F-B344-DC4DAED8C421}
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Demo", "Demo", "{6F9AA85C-D9F9-4029-8F5D-D6BD5B27C761}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Forge", "Forge", "{7B8C29CF-246C-44FC-B457-D1397BB7D10B}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "OS", "..\third-party\The-Forge\Examples_3\Unit_Tests\PC Visual Studio 2019\Libraries\OS\OS.vcxproj", "{30DD3D57-0026-48C8-BFD1-6392F319E23A}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Renderer", "..\third-party\The-Forge\Examples_3\Unit_Tests\PC Visual Studio 2019\Libraries\Renderer\Renderer.vcxproj", "{DB6193E0-3C12-450F-B344-DC4DAED8C421}"
+	ProjectSection(ProjectDependencies) = postProject
+		{F3C4507C-E714-4773-AF45-5FA9FB0BB4AF} = {F3C4507C-E714-4773-AF45-5FA9FB0BB4AF}
+	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "RendererVulkan", "..\third-party\The-Forge\Examples_3\Unit_Tests\PC Visual Studio 2019\Libraries\Tests\RendererVulkan.vcxproj", "{0D2A392A-A59C-425E-ACD8-2FE1682346A8}"
+	ProjectSection(ProjectDependencies) = postProject
+		{F3C4507C-E714-4773-AF45-5FA9FB0BB4AF} = {F3C4507C-E714-4773-AF45-5FA9FB0BB4AF}
+	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "SpirvTools", "..\third-party\The-Forge\Examples_3\Unit_Tests\PC Visual Studio 2019\Libraries\Tools\SpirvCross.vcxproj", "{F3C4507C-E714-4773-AF45-5FA9FB0BB4AF}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug-Direct3D12|x64 = Debug-Direct3D12|x64
+		Debug-Vulkan|x64 = Debug-Vulkan|x64
+		Release-Direct3D12|x64 = Release-Direct3D12|x64
+		Release-Vulkan|x64 = Release-Vulkan|x64
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{85FA96DD-AD94-4462-AFF9-524FDDB4603C}.Debug-Direct3D12|x64.ActiveCfg = Debug-Direct3D12|x64
+		{85FA96DD-AD94-4462-AFF9-524FDDB4603C}.Debug-Direct3D12|x64.Build.0 = Debug-Direct3D12|x64
+		{85FA96DD-AD94-4462-AFF9-524FDDB4603C}.Debug-Vulkan|x64.ActiveCfg = Debug-Vulkan|x64
+		{85FA96DD-AD94-4462-AFF9-524FDDB4603C}.Debug-Vulkan|x64.Build.0 = Debug-Vulkan|x64
+		{85FA96DD-AD94-4462-AFF9-524FDDB4603C}.Release-Direct3D12|x64.ActiveCfg = Release-Direct3D12|x64
+		{85FA96DD-AD94-4462-AFF9-524FDDB4603C}.Release-Direct3D12|x64.Build.0 = Release-Direct3D12|x64
+		{85FA96DD-AD94-4462-AFF9-524FDDB4603C}.Release-Vulkan|x64.ActiveCfg = Release-Vulkan|x64
+		{85FA96DD-AD94-4462-AFF9-524FDDB4603C}.Release-Vulkan|x64.Build.0 = Release-Vulkan|x64
+		{30DD3D57-0026-48C8-BFD1-6392F319E23A}.Debug-Direct3D12|x64.ActiveCfg = Debug|x64
+		{30DD3D57-0026-48C8-BFD1-6392F319E23A}.Debug-Direct3D12|x64.Build.0 = Debug|x64
+		{30DD3D57-0026-48C8-BFD1-6392F319E23A}.Debug-Vulkan|x64.ActiveCfg = Debug|x64
+		{30DD3D57-0026-48C8-BFD1-6392F319E23A}.Debug-Vulkan|x64.Build.0 = Debug|x64
+		{30DD3D57-0026-48C8-BFD1-6392F319E23A}.Release-Direct3D12|x64.ActiveCfg = Release|x64
+		{30DD3D57-0026-48C8-BFD1-6392F319E23A}.Release-Direct3D12|x64.Build.0 = Release|x64
+		{30DD3D57-0026-48C8-BFD1-6392F319E23A}.Release-Vulkan|x64.ActiveCfg = Release|x64
+		{30DD3D57-0026-48C8-BFD1-6392F319E23A}.Release-Vulkan|x64.Build.0 = Release|x64
+		{DB6193E0-3C12-450F-B344-DC4DAED8C421}.Debug-Direct3D12|x64.ActiveCfg = Debug|x64
+		{DB6193E0-3C12-450F-B344-DC4DAED8C421}.Debug-Direct3D12|x64.Build.0 = Debug|x64
+		{DB6193E0-3C12-450F-B344-DC4DAED8C421}.Debug-Vulkan|x64.ActiveCfg = Debug|x64
+		{DB6193E0-3C12-450F-B344-DC4DAED8C421}.Debug-Vulkan|x64.Build.0 = Debug|x64
+		{DB6193E0-3C12-450F-B344-DC4DAED8C421}.Release-Direct3D12|x64.ActiveCfg = Release|x64
+		{DB6193E0-3C12-450F-B344-DC4DAED8C421}.Release-Direct3D12|x64.Build.0 = Release|x64
+		{DB6193E0-3C12-450F-B344-DC4DAED8C421}.Release-Vulkan|x64.ActiveCfg = Release|x64
+		{DB6193E0-3C12-450F-B344-DC4DAED8C421}.Release-Vulkan|x64.Build.0 = Release|x64
+		{0D2A392A-A59C-425E-ACD8-2FE1682346A8}.Debug-Direct3D12|x64.ActiveCfg = Debug|x64
+		{0D2A392A-A59C-425E-ACD8-2FE1682346A8}.Debug-Direct3D12|x64.Build.0 = Debug|x64
+		{0D2A392A-A59C-425E-ACD8-2FE1682346A8}.Debug-Vulkan|x64.ActiveCfg = Debug|x64
+		{0D2A392A-A59C-425E-ACD8-2FE1682346A8}.Debug-Vulkan|x64.Build.0 = Debug|x64
+		{0D2A392A-A59C-425E-ACD8-2FE1682346A8}.Release-Direct3D12|x64.ActiveCfg = Release|x64
+		{0D2A392A-A59C-425E-ACD8-2FE1682346A8}.Release-Direct3D12|x64.Build.0 = Release|x64
+		{0D2A392A-A59C-425E-ACD8-2FE1682346A8}.Release-Vulkan|x64.ActiveCfg = Release|x64
+		{0D2A392A-A59C-425E-ACD8-2FE1682346A8}.Release-Vulkan|x64.Build.0 = Release|x64
+		{F3C4507C-E714-4773-AF45-5FA9FB0BB4AF}.Debug-Direct3D12|x64.ActiveCfg = Debug|x64
+		{F3C4507C-E714-4773-AF45-5FA9FB0BB4AF}.Debug-Direct3D12|x64.Build.0 = Debug|x64
+		{F3C4507C-E714-4773-AF45-5FA9FB0BB4AF}.Debug-Vulkan|x64.ActiveCfg = Debug|x64
+		{F3C4507C-E714-4773-AF45-5FA9FB0BB4AF}.Debug-Vulkan|x64.Build.0 = Debug|x64
+		{F3C4507C-E714-4773-AF45-5FA9FB0BB4AF}.Release-Direct3D12|x64.ActiveCfg = Release|x64
+		{F3C4507C-E714-4773-AF45-5FA9FB0BB4AF}.Release-Direct3D12|x64.Build.0 = Release|x64
+		{F3C4507C-E714-4773-AF45-5FA9FB0BB4AF}.Release-Vulkan|x64.ActiveCfg = Release|x64
+		{F3C4507C-E714-4773-AF45-5FA9FB0BB4AF}.Release-Vulkan|x64.Build.0 = Release|x64
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{85FA96DD-AD94-4462-AFF9-524FDDB4603C} = {6F9AA85C-D9F9-4029-8F5D-D6BD5B27C761}
+		{30DD3D57-0026-48C8-BFD1-6392F319E23A} = {7B8C29CF-246C-44FC-B457-D1397BB7D10B}
+		{DB6193E0-3C12-450F-B344-DC4DAED8C421} = {7B8C29CF-246C-44FC-B457-D1397BB7D10B}
+		{0D2A392A-A59C-425E-ACD8-2FE1682346A8} = {7B8C29CF-246C-44FC-B457-D1397BB7D10B}
+		{F3C4507C-E714-4773-AF45-5FA9FB0BB4AF} = {7B8C29CF-246C-44FC-B457-D1397BB7D10B}
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {54C1BAA4-196B-4D6B-8513-8F6A8F1CCE6D}
+	EndGlobalSection
+EndGlobal

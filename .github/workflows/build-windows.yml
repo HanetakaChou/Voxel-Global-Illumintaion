@@ -1,0 +1,26 @@
+name: build windows
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  build_windows:
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        configuration: [Debug-Direct3D12, Debug-Vulkan, Release-Direct3D12, Release-Vulkan]
+        platform: [x64]
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: 'true'
+      - uses: microsoft/setup-msbuild@v2
+        with:
+          msbuild-architecture: x64
+      - shell: cmd
+        run: |
+          msbuild "./third-party/The-Forge/Examples_3/Unit_Tests/PC Visual Studio 2019/Libraries/Tools/SpirvCross.vcxproj" /p:SolutionDir="%cd%/build/" /p:Configuration=${{matrix.configuration}} /p:Platform=${{matrix.platform}}
+          msbuild ./build/Demo.sln /p:Configuration=${{matrix.configuration}} /p:Platform=${{matrix.platform}}

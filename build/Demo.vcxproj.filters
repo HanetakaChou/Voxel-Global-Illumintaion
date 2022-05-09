@@ -1,0 +1,57 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="shaders">
+      <UniqueIdentifier>{7fc7d2a4-4faf-4279-b861-664d4d2170c2}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="code">
+      <UniqueIdentifier>{20153dd0-6bb5-431c-851b-d1cf239b3bd6}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="third-party">
+      <UniqueIdentifier>{cff7962d-404e-436e-9c58-4e2527b7bb9f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="assets">
+      <UniqueIdentifier>{98bc175d-95a2-4b65-a614-fb386a5f81fd}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="third-party\The-Forge">
+      <UniqueIdentifier>{7aec4d8c-45f6-458b-9fe3-ac3ce2da8588}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <FSLShader Include="..\shaders\Demo_ShaderList.fsl">
+      <Filter>shaders</Filter>
+    </FSLShader>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\shaders\light_injection.hlsli">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="..\third-party\The-Forge\Examples_3\Build_Props\VS\TF_Shared.props">
+      <Filter>third-party\The-Forge</Filter>
+    </None>
+    <None Include="..\third-party\The-Forge\Examples_3\Build_Props\VS\Examples.x64.props">
+      <Filter>third-party\The-Forge</Filter>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\code\main.cpp">
+      <Filter>code</Filter>
+    </ClCompile>
+    <ClCompile Include="..\assets\cornell_box.cpp">
+      <Filter>assets</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\assets\cornell_box.h">
+      <Filter>assets</Filter>
+    </ClInclude>
+    <ClInclude Include="..\shaders\light_injection_shared.h">
+      <Filter>shaders</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <CopyFileToFolders Include="..\third-party\gpu.cfg">
+      <Filter>third-party</Filter>
+    </CopyFileToFolders>
+  </ItemGroup>
+</Project>
