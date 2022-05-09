@@ -1,0 +1,36 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="code">
+      <UniqueIdentifier>{d21fdc33-9e41-4f7b-b35d-cf626d1bd93e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="code\support">
+      <UniqueIdentifier>{e99c8422-d62d-41a8-ad53-0c44c1e6a3fe}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="code\support\camera_controller.cpp">
+      <Filter>code\support</Filter>
+    </ClCompile>
+    <ClCompile Include="code\support\window_main.cpp">
+      <Filter>code\support</Filter>
+    </ClCompile>
+    <ClCompile Include="code\support\render_main.cpp">
+      <Filter>code\support</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="code\support\camera_controller.h">
+      <Filter>code\support</Filter>
+    </ClInclude>
+    <ClInclude Include="code\support\window_main.h">
+      <Filter>code\support</Filter>
+    </ClInclude>
+    <ClInclude Include="code\support\render_main.h">
+      <Filter>code\support</Filter>
+    </ClInclude>
+    <ClInclude Include="code\support\resolution.h">
+      <Filter>code\support</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>
