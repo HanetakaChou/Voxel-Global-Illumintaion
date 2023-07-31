@@ -8,7 +8,9 @@
 
 class CameraController g_camera_controller;
 
-static float g_SpeedTranslate = 0.5f;
+static float g_SpeedTranslate = 0.5F;
+
+static float g_SpeedRotate = 2.0F;
 
 void CameraController::MoveForward()
 {
@@ -120,7 +122,7 @@ void CameraController::OnMouseMove(float x, float y, bool hold)
 			DirectX::XMVECTOR AxisViewUpDirection = DirectX::XMVector3Cross(AxisForwardDirection, AxisRightDirection);
 
 			DirectX::XMFLOAT3 EyeDirectionNew;
-			DirectX::XMStoreFloat3(&EyeDirectionNew, DirectX::XMVectorNegate(DirectX::XMVector3Transform(AxisForwardDirection, DirectX::XMMatrixRotationAxis(AxisViewUpDirection, -2.0f * LengthNormalized))));
+			DirectX::XMStoreFloat3(&EyeDirectionNew, DirectX::XMVectorNegate(DirectX::XMVector3Transform(AxisForwardDirection, DirectX::XMMatrixRotationAxis(AxisViewUpDirection, -g_SpeedRotate * LengthNormalized))));
 			m_eye_direction.x = EyeDirectionNew.x;
 			m_eye_direction.y = EyeDirectionNew.y;
 			m_eye_direction.z = EyeDirectionNew.z;
@@ -137,7 +139,7 @@ void CameraController::OnMouseMove(float x, float y, bool hold)
 			DirectX::XMVECTOR AxisViewUpDirection = DirectX::XMVector3Cross(AxisForwardDirection, AxisRightDirection);
 
 			DirectX::XMFLOAT3 EyeDirectionNew;
-			DirectX::XMStoreFloat3(&EyeDirectionNew, DirectX::XMVectorNegate(DirectX::XMVector3Transform(AxisForwardDirection, DirectX::XMMatrixRotationAxis(AxisViewUpDirection, 2.0f * LengthNormalized))));
+			DirectX::XMStoreFloat3(&EyeDirectionNew, DirectX::XMVectorNegate(DirectX::XMVector3Transform(AxisForwardDirection, DirectX::XMMatrixRotationAxis(AxisViewUpDirection, g_SpeedRotate * LengthNormalized))));
 			m_eye_direction.x = EyeDirectionNew.x;
 			m_eye_direction.y = EyeDirectionNew.y;
 			m_eye_direction.z = EyeDirectionNew.z;
@@ -154,7 +156,7 @@ void CameraController::OnMouseMove(float x, float y, bool hold)
 			DirectX::XMVECTOR AxisViewUpDirection = DirectX::XMVector3Cross(AxisForwardDirection, AxisRightDirection);
 
 			DirectX::XMFLOAT3 EyeDirectionNew;
-			DirectX::XMStoreFloat3(&EyeDirectionNew, DirectX::XMVectorNegate(DirectX::XMVector3Transform(AxisForwardDirection, DirectX::XMMatrixRotationAxis(AxisRightDirection, 2.0f * LengthNormalized))));
+			DirectX::XMStoreFloat3(&EyeDirectionNew, DirectX::XMVectorNegate(DirectX::XMVector3Transform(AxisForwardDirection, DirectX::XMMatrixRotationAxis(AxisRightDirection, g_SpeedRotate * LengthNormalized))));
 			m_eye_direction.x = EyeDirectionNew.x;
 			m_eye_direction.y = EyeDirectionNew.y;
 			m_eye_direction.z = EyeDirectionNew.z;
@@ -171,7 +173,7 @@ void CameraController::OnMouseMove(float x, float y, bool hold)
 			DirectX::XMVECTOR AxisViewUpDirection = DirectX::XMVector3Cross(AxisForwardDirection, AxisRightDirection);
 
 			DirectX::XMFLOAT3 EyeDirectionNew;
-			DirectX::XMStoreFloat3(&EyeDirectionNew, DirectX::XMVectorNegate(DirectX::XMVector3Transform(AxisForwardDirection, DirectX::XMMatrixRotationAxis(AxisRightDirection, -2.0f * LengthNormalized))));
+			DirectX::XMStoreFloat3(&EyeDirectionNew, DirectX::XMVectorNegate(DirectX::XMVector3Transform(AxisForwardDirection, DirectX::XMMatrixRotationAxis(AxisRightDirection, -g_SpeedRotate * LengthNormalized))));
 			m_eye_direction.x = EyeDirectionNew.x;
 			m_eye_direction.y = EyeDirectionNew.y;
 			m_eye_direction.z = EyeDirectionNew.z;
