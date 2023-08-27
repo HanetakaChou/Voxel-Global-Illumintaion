@@ -52,7 +52,7 @@ static float g_fAmbientRange = 512.0f;
 static bool g_bEnableVXAO = true;
 static bool g_bVisualizeAO = false;
 static bool g_bRenderHUD = true;
-static VXGI::DebugRenderMode::Enum g_DebugRenderMode = VXGI::DebugRenderMode::DISABLED;
+static VXGI::DebugRenderMode::Enum g_DebugRenderMode = VXGI::DebugRenderMode::OPACITY_TEXTURE;
 static int g_iDebugLevel = 0;
 static bool g_bInitialized = false;
 static int g_iTracingSparsity = 4;
@@ -108,7 +108,9 @@ HRESULT CreateVXGIObject()
 
     VXGI::VoxelizationParameters voxelizationParams;
     voxelizationParams.emittanceFormat = VXGI::EmittanceFormat::NONE; // Enable VXAO mode
+    voxelizationParams.opacityDirectionCount = VXGI::OpacityDirections::THREE_DIMENSIONAL;
     voxelizationParams.mapSize = 128;
+    voxelizationParams.persistentVoxelData = false;
     voxelizationParams.enableNvidiaExtensions = false;
     voxelizationParams.enableGeometryShaderPassthrough = false;
 
@@ -354,19 +356,26 @@ class MainVisualController : public IVisualController
 
         if (g_DebugRenderMode != VXGI::DebugRenderMode::DISABLED)
         {
-            VXGI::DebugRenderParameters params;
-            params.debugMode = g_DebugRenderMode;
-            params.viewMatrix = *(VXGI::Matrix4f *)&viewMatrix;
-            params.projMatrix = *(VXGI::Matrix4f *)&projMatrix;
-            params.viewport = inputBuffers.gbufferViewport;
-            params.destinationTexture = gbufferAlbedo;
-            params.destinationDepth = inputBuffers.gbufferDepth;
-            params.level = g_iDebugLevel;
-            params.blendState.blendEnable[0] = true;
-            params.blendState.srcBlend[0] = NVRHI::BlendState::BLEND_SRC_ALPHA;
-            params.blendState.destBlend[0] = NVRHI::BlendState::BLEND_INV_SRC_ALPHA;
+            // VXGI
+            {
+                g_pRendererInterface->debugBeginEvent("VXGI");
 
-            g_pGI->renderDebug(params);
+                VXGI::DebugRenderParameters params;
+                params.debugMode = g_DebugRenderMode;
+                params.viewMatrix = *(VXGI::Matrix4f*)&viewMatrix;
+                params.projMatrix = *(VXGI::Matrix4f*)&projMatrix;
+                params.viewport = inputBuffers.gbufferViewport;
+                params.destinationTexture = gbufferAlbedo;
+                params.destinationDepth = inputBuffers.gbufferDepth;
+                params.level = g_iDebugLevel;
+                params.blendState.blendEnable[0] = true;
+                params.blendState.srcBlend[0] = NVRHI::BlendState::BLEND_SRC_ALPHA;
+                params.blendState.destBlend[0] = NVRHI::BlendState::BLEND_INV_SRC_ALPHA;
+
+                g_pGI->renderDebug(params);
+
+                g_pRendererInterface->debugEndEvent();
+            }
 
             g_pSceneRenderer->Blit(gbufferAlbedo, mainRenderTarget);
         }

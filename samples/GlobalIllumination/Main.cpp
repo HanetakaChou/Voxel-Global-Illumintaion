@@ -274,7 +274,7 @@ class MainVisualController : public IVisualController
         static VXGI::VoxelizationParameters previousParams;
 
         VXGI::VoxelizationParameters voxelizationParams;
-        voxelizationParams.opacityDirectionCount = VXGI::OpacityDirections::SIX_DIMENSIONAL;
+        voxelizationParams.opacityDirectionCount = VXGI::OpacityDirections::THREE_DIMENSIONAL;
         voxelizationParams.mapSize = 128;
         voxelizationParams.enableMultiBounce = g_bEnableMultiBounce;
         voxelizationParams.persistentVoxelData = !g_bEnableMultiBounce;
