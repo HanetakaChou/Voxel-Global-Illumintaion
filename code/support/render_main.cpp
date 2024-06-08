@@ -16,25 +16,25 @@
 
 #include "../demo.h"
 
-unsigned __stdcall render_main(void* pVoid)
+unsigned __stdcall render_main(void *pVoid)
 {
 	HWND hWnd = static_cast<HWND>(pVoid);
 
-	ID3D11Device* d3d11_device = NULL;
-	ID3D11DeviceContext* d3d11_device_context = NULL;
-	IDXGISwapChain* dxgi_swap_chain = NULL;
+	ID3D11Device *d3d11_device = NULL;
+	ID3D11DeviceContext *d3d11_device_context = NULL;
+	IDXGISwapChain *dxgi_swap_chain = NULL;
 	{
-		IDXGIFactory1* dxgi_factory = NULL;
+		IDXGIFactory1 *dxgi_factory = NULL;
 		HRESULT res_create_dxgi_factory = CreateDXGIFactory1(IID_PPV_ARGS(&dxgi_factory));
 		assert(SUCCEEDED(res_create_dxgi_factory));
 
-		IDXGIAdapter1* dxgi_adapter = NULL;
+		IDXGIAdapter1 *dxgi_adapter = NULL;
 		// "0U" means "default" adapter // perhaps user-select
 		HRESULT res_dxgi_factory_enum_adapters = dxgi_factory->EnumAdapters1(0U, &dxgi_adapter);
 		assert(SUCCEEDED(res_dxgi_factory_enum_adapters));
 
-		D3D_FEATURE_LEVEL pFeatureLevels[1] = { D3D_FEATURE_LEVEL_11_0 };
-		HRESULT res_d3d11_create_device = D3D11CreateDevice(
+		D3D_FEATURE_LEVEL pFeatureLevels[1] = {D3D_FEATURE_LEVEL_11_0};
+		HRESULT res_d3d_create_device = D3D11CreateDevice(
 			dxgi_adapter,
 			D3D_DRIVER_TYPE_UNKNOWN,
 			NULL,
@@ -48,9 +48,8 @@ unsigned __stdcall render_main(void* pVoid)
 			D3D11_SDK_VERSION,
 			&d3d11_device,
 			NULL,
-			&d3d11_device_context
-		);
-		assert(SUCCEEDED(res_d3d11_create_device));
+			&d3d11_device_context);
+		assert(SUCCEEDED(res_d3d_create_device));
 
 		DXGI_SWAP_CHAIN_DESC dxgi_swap_chain_desc;
 		dxgi_swap_chain_desc.BufferDesc.Width = g_resolution_width;
@@ -81,7 +80,7 @@ unsigned __stdcall render_main(void* pVoid)
 
 	while (!g_window_quit)
 	{
-		demo.Tick(d3d11_device, d3d11_device_context, dxgi_swap_chain);
+		demo.Tick(d3d11_device_context, dxgi_swap_chain);
 	}
 
 	d3d11_device_context->Release();
