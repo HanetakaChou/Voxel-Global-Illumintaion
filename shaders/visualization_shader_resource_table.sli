@@ -1,0 +1,51 @@
+//
+// Copyright (C) YuqiaoZhang(HanetakaChou)
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Lesser General Public License as published
+// by the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Lesser General Public License for more details.
+//
+// You should have received a copy of the GNU Lesser General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+//
+
+#ifndef _SHADERS_VISUALIZATION_SHADER_RESOURCE_TABLE_SLI_
+#define _SHADERS_VISUALIZATION_SHADER_RESOURCE_TABLE_SLI_ 1
+
+#include "vct_configuration.sli"
+
+#if defined(__STDC__) || defined(__cplusplus)
+
+struct visualization_constant_buffer_frame
+{
+    DirectX::XMFLOAT3A g_main_camera_position;
+    DirectX::XMFLOAT4X4 g_main_camera_inverse_view_matrix;
+    DirectX::XMFLOAT4X4 g_main_camera_inverse_projection_matrix;
+    DirectX::XMFLOAT3A g_clipmap_center;
+    DirectX::XMFLOAT3A g_clipmap_level_toroidal_offsets[VCT_CLIPMAP_LEVEL_COUNT];
+};
+
+#elif defined(HLSL_VERSION) || defined(__HLSL_VERSION)
+
+cbuffer visualization_constant_buffer_frame : register(b0)
+{
+    float3 g_main_camera_position;
+    row_major float4x4 g_main_camera_inverse_view_matrix;
+    row_major float4x4 g_main_camera_inverse_projection_matrix;
+    float3 g_clipmap_center;
+    float3 g_clipmap_level_toroidal_offsets[VCT_CLIPMAP_LEVEL_COUNT];
+};
+
+Texture3D<uint> g_clipmap_opacity[VCT_CLIPMAP_LEVEL_COUNT] : register(t0);
+
+#else
+#error Unknown Compiler
+#endif
+
+#endif

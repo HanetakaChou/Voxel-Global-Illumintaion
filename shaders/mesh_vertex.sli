@@ -1,0 +1,43 @@
+//
+// Copyright (C) YuqiaoZhang(HanetakaChou)
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Lesser General Public License as published
+// by the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Lesser General Public License for more details.
+//
+// You should have received a copy of the GNU Lesser General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+//
+
+#ifndef _SHADERS_MESH_VERTEX_SLI_
+#define _SHADERS_MESH_VERTEX_SLI_ 1
+
+#define g_vertex_position_buffer_stride 12u
+#define g_index_uint32_buffer_stride 4u
+
+#if defined(__STDC__) || defined(__cplusplus)
+
+struct mesh_vertex_position
+{
+    float position_x;
+    float position_y;
+    float position_z;
+};
+
+static_assert(sizeof(mesh_vertex_position) == g_vertex_position_buffer_stride, "");
+static_assert(0U == (g_vertex_position_buffer_stride % 4U), "");
+static_assert(sizeof(uint32_t) == g_index_uint32_buffer_stride, "");
+
+#elif defined(HLSL_VERSION) || defined(__HLSL_VERSION)
+
+#else
+#error Unknown Compiler
+#endif
+
+#endif

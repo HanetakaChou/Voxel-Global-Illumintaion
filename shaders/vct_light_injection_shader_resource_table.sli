@@ -1,0 +1,62 @@
+//
+// Copyright (C) YuqiaoZhang(HanetakaChou)
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Lesser General Public License as published
+// by the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Lesser General Public License for more details.
+//
+// You should have received a copy of the GNU Lesser General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+//
+
+#ifndef _VCT_LIGHT_INJECTION_SHADER_RESOURCE_TABLE_SLI_
+#define _VCT_LIGHT_INJECTION_SHADER_RESOURCE_TABLE_SLI_ 1
+
+#include "vct_configuration.sli"
+#include "vct_constant.sli"
+
+#if defined(__STDC__) || defined(__cplusplus)
+
+struct light_injection_per_batch_constant_buffer
+{
+	DirectX::XMFLOAT4X4 g_viewport_depth_direction_view_matrices[VCT_VIEWPORT_DEPTH_DIRECTION_COUNT];
+	DirectX::XMFLOAT4X4 g_clipmap_level_projection_matrices[VCT_CLIPMAP_LEVEL_COUNT];
+	DirectX::XMFLOAT3A g_clipmap_level_toroidal_offsets[VCT_CLIPMAP_LEVEL_COUNT];
+};
+
+struct light_injection_per_draw_constant_buffer
+{
+	DirectX::XMFLOAT4X4 g_model_matrix;
+};
+
+#elif defined(HLSL_VERSION) || defined(__HLSL_VERSION)
+
+cbuffer light_injection_per_batch_constant_buffer : register(b0)
+{
+	row_major float4x4 g_viewport_depth_direction_view_matrices[VCT_VIEWPORT_DEPTH_DIRECTION_COUNT];
+	row_major float4x4 g_clipmap_level_projection_matrices[VCT_CLIPMAP_LEVEL_COUNT];
+	float3 g_clipmap_level_toroidal_offsets[VCT_CLIPMAP_LEVEL_COUNT];
+};
+
+cbuffer light_injection_per_draw_constant_buffer : register(b1)
+{
+	row_major float4x4 g_model_matrix;
+};
+
+ByteAddressBuffer g_vertex_position_buffer : register(t0);
+
+ByteAddressBuffer g_index_buffer : register(t1);
+
+RWTexture3D<uint> g_clipmap_opacity[VCT_CLIPMAP_LEVEL_COUNT] : register(u1);
+
+#else
+#error Unknown Compiler
+#endif
+
+#endif

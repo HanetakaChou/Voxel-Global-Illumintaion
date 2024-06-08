@@ -1,11 +1,17 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
+    <Filter Include="shaders">
+      <UniqueIdentifier>{a7c933e8-f964-4aa3-b8f8-94cb8dde6d47}</UniqueIdentifier>
+    </Filter>
     <Filter Include="code">
       <UniqueIdentifier>{d21fdc33-9e41-4f7b-b35d-cf626d1bd93e}</UniqueIdentifier>
     </Filter>
     <Filter Include="code\support">
       <UniqueIdentifier>{e99c8422-d62d-41a8-ad53-0c44c1e6a3fe}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="assets">
+      <UniqueIdentifier>{35ed1879-5dc0-4322-8ba6-5b210cf7e823}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -20,6 +26,12 @@
     </ClCompile>
     <ClCompile Include="code\demo.cpp">
       <Filter>code</Filter>
+    </ClCompile>
+    <ClCompile Include="assets\sponza_indices.cpp">
+      <Filter>assets</Filter>
+    </ClCompile>
+    <ClCompile Include="assets\sponza_vertex_positions.cpp">
+      <Filter>assets</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -38,5 +50,39 @@
     <ClInclude Include="code\demo.h">
       <Filter>code</Filter>
     </ClInclude>
+    <ClInclude Include="assets\sponza.h">
+      <Filter>assets</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <FxCompile Include="shaders\visualization_pixel.hlsl">
+      <Filter>shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="shaders\full_screen_triangle_vertex.hlsl">
+      <Filter>shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="shaders\vct_light_injection_mesh_vertex.hlsl">
+      <Filter>shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="shaders\vct_light_injection_pixel.hlsl">
+      <Filter>shaders</Filter>
+    </FxCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="shaders\vct_light_injection_shader_resource_table.sli">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="shaders\visualization_shader_resource_table.sli">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="shaders\vct_configuration.sli">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="shaders\vct_constant.sli">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="shaders\mesh_vertex.sli">
+      <Filter>shaders</Filter>
+    </None>
   </ItemGroup>
 </Project>

@@ -1,0 +1,36 @@
+//
+// Copyright (C) YuqiaoZhang(HanetakaChou)
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Lesser General Public License as published
+// by the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Lesser General Public License for more details.
+//
+// You should have received a copy of the GNU Lesser General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+//
+
+#ifndef _VCT_CONFIGURATION_SLI_
+#define _VCT_CONFIGURATION_SLI_ 1
+
+// clip map size, in texels.
+#define VCT_CLIPMAP_SIZE 128
+
+// Size of a voxel in the finest clipmap level, in world units.
+#define VCT_FINEST_VOXEL_SIZE 8
+
+//
+#define VCT_CLIPMAP_LEVEL_COUNT 5
+
+//
+#define VCT_VOXELIZATION_SAMPLE_COUNT 8
+
+// Controls whether opacity and emittance voxel data can be preserved between frames. 
+#define VCT_PERSISTENT_VOXEL_DATA 0
+
+#endif
