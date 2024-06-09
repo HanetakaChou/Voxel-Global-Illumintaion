@@ -33,7 +33,7 @@ SceneRenderer::SceneRenderer(NVRHI::IRendererInterface *pRenderer)
 HRESULT SceneRenderer::LoadMesh(const char *strFileName)
 {
     m_pScene = new Scene();
-    return m_pScene->Load(strFileName, 0);
+    return m_pScene->Load(strFileName);
 }
 
 HRESULT SceneRenderer::AllocateResources(VXGI::IGlobalIllumination *pGI, VXGI::IShaderCompiler *pCompiler)
@@ -43,11 +43,7 @@ HRESULT SceneRenderer::AllocateResources(VXGI::IGlobalIllumination *pGI, VXGI::I
     const NVRHI::VertexAttributeDesc SceneLayout[] =
         {
             {"POSITION", 0, NVRHI::Format::RGB32_FLOAT, 0, offsetof(VertexBufferEntry, position), false},
-            {"TEXCOORD", 0, NVRHI::Format::RG32_FLOAT, 0, offsetof(VertexBufferEntry, texCoord), false},
-            {"NORMAL", 0, NVRHI::Format::RGB32_FLOAT, 0, offsetof(VertexBufferEntry, normal), false},
-            {"TANGENT", 0, NVRHI::Format::RGB32_FLOAT, 0, offsetof(VertexBufferEntry, tangent), false},
-            {"BINORMAL", 0, NVRHI::Format::RGB32_FLOAT, 0, offsetof(VertexBufferEntry, binormal), false},
-        };
+            {"NORMAL", 0, NVRHI::Format::RGB32_FLOAT, 0, offsetof(VertexBufferEntry, normal), false}};
 
     m_RendererInterface->createInputLayout(SceneLayout, _countof(SceneLayout), g_DefaultVS, sizeof(g_DefaultVS), &m_pInputLayout);
 
@@ -94,7 +90,7 @@ HRESULT SceneRenderer::AllocateResources(VXGI::IGlobalIllumination *pGI, VXGI::I
         blob->dispose();
     }
 
-    // Voxelization GS
+    // Voxelization PS
     {
         VXGI::ShaderResources resources;
         resources.constantBufferCount = 0;
@@ -131,18 +127,18 @@ void SceneRenderer::AllocateViewDependentResources(UINT width, UINT height, UINT
 
     gbufferDesc.format = NVRHI::Format::RGBA8_UNORM;
     gbufferDesc.clearValue = NVRHI::Color(0.f);
-    gbufferDesc.debugName = "GbufferAlbedo";
+    gbufferDesc.debugName = "GbufferC (BaseColor + Metallic)";
     m_RendererInterface->createTexture(gbufferDesc, NULL, &m_TargetAlbedo);
 
     gbufferDesc.format = NVRHI::Format::RGBA16_FLOAT;
     gbufferDesc.clearValue = NVRHI::Color(0.f);
-    gbufferDesc.debugName = "GbufferNormals";
+    gbufferDesc.debugName = "GbufferA (Normal + Roughness)";
     m_RendererInterface->createTexture(gbufferDesc, NULL, &m_TargetNormal);
     m_RendererInterface->createTexture(gbufferDesc, NULL, &m_TargetNormalPrev);
 
-    gbufferDesc.format = NVRHI::Format::D24S8;
+    gbufferDesc.format = NVRHI::Format::D32;
     gbufferDesc.clearValue = NVRHI::Color(1.f, 0.f, 0.f, 0.f);
-    gbufferDesc.debugName = "GbufferDepth";
+    gbufferDesc.debugName = "Depth";
     m_RendererInterface->createTexture(gbufferDesc, NULL, &m_TargetDepth);
     m_RendererInterface->createTexture(gbufferDesc, NULL, &m_TargetDepthPrev);
 }
@@ -186,9 +182,7 @@ void SceneRenderer::RenderToGBuffer(const VXGI::float4x4 &viewProjMatrix)
 
     MaterialCallback onChangeMaterial = [this, &state](const MeshMaterialInfo &material)
     {
-        NVRHI::BindTexture(state.PS, 0, material.diffuseTexture ? material.diffuseTexture : m_NullTexture, false, NVRHI::Format::UNKNOWN, ~0u);
-        NVRHI::BindTexture(state.PS, 1, material.normalsTexture ? material.normalsTexture : m_NullTexture, false, NVRHI::Format::UNKNOWN, ~0u);
-        NVRHI::BindTexture(state.PS, 2, material.opacityTexture ? material.opacityTexture : m_WhiteDummy, false, NVRHI::Format::UNKNOWN, ~0u);
+        NVRHI::BindConstantBuffer(state.PS, 1, material.materialBuffer);
     };
 
     state.PS.shader = m_pAttributesPS;
@@ -230,6 +224,8 @@ void SceneRenderer::RenderSceneCommon(
     state.vertexBuffers[0].stride = sizeof(VertexBufferEntry);
 
     NVRHI::BindConstantBuffer(state.VS, 0, m_pGlobalCBuffer);
+
+    state.renderState.rasterState.frontCounterClockwise = true;
 
     m_RendererInterface->beginRenderingPass();
 
@@ -295,7 +291,7 @@ void SceneRenderer::RenderSceneCommon(
                     state.GS = voxelizationState.GS;
                     state.PS = voxelizationState.PS;
                     state.renderState = voxelizationState.renderState;
-                    state.renderState.rasterState.frontCounterClockwise = true;
+                    state.renderState.rasterState.frontCounterClockwise = false;
                 }
             }
 
@@ -326,11 +322,7 @@ void SceneRenderer::RenderSceneCommon(
 
 void SceneRenderer::GetMaterialInfo(UINT meshID, OUT MeshMaterialInfo &materialInfo)
 {
-    materialInfo.diffuseTexture = m_pScene->GetTextureSRV(aiTextureType_DIFFUSE, meshID);
-    materialInfo.normalsTexture = m_pScene->GetTextureSRV(aiTextureType_NORMALS, meshID);
-    materialInfo.opacityTexture = m_pScene->GetTextureSRV(aiTextureType_OPACITY, meshID);
-
-    materialInfo.diffuseColor = m_pScene->GetColor(aiTextureType_DIFFUSE, meshID);
+    materialInfo.materialBuffer = m_pScene->GetMaterialBuffer(meshID);
 
     materialInfo.geometryShader = m_pVoxelizationGS;
     materialInfo.pixelShader = m_pVoxelizationPS;

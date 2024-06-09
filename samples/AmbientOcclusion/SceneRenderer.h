@@ -24,15 +24,9 @@ __declspec(align(16)) struct GlobalConstants
 
 struct MeshMaterialInfo : public VXGI::MaterialInfo
 {
-    NVRHI::TextureHandle diffuseTexture;
-    NVRHI::TextureHandle normalsTexture;
-    NVRHI::TextureHandle opacityTexture;
-    VXGI::float3 diffuseColor;
+    NVRHI::ConstantBufferRef materialBuffer;
 
-    MeshMaterialInfo() : diffuseTexture(NULL),
-                         normalsTexture(NULL),
-                         opacityTexture(NULL),
-                         diffuseColor(0.f)
+    MeshMaterialInfo()
     {
     }
 };

@@ -11,10 +11,7 @@
 char const g_TransparentGeometryPS[] = R"(struct PSInput
 {
     float4 position : SV_Position;
-    float2 texCoord : TEXCOORD;
     float3 normal   : NORMAL;
-    float3 tangent  : TANGENT;
-    float3 binormal : BINORMAL;
     float3 positionWS : WSPOSITION;
 };
 
@@ -25,8 +22,7 @@ cbuffer GlobalConstants : register(b0)
     float4x4 g_ViewProjMatrixInv;
     float4x4 g_LightViewProjMatrix;
     float4 g_CameraPos;
-    float4 g_LightDirection;
-    float4 g_DiffuseColor;
+    float4 g_LightPos;
     float4 g_LightColor;
     float4 g_AmbientColor;
     float g_rShadowMapSize;
@@ -34,6 +30,13 @@ cbuffer GlobalConstants : register(b0)
     uint g_EnableIndirectSpecular;
     float g_TransparentRoughness;
     float g_TransparentReflectance;
+};
+
+cbuffer MaterialConstants : register(b1)
+{
+    float4 g_BaseColor;
+    float g_Metallic;
+    float g_Roughness;
 };
 
 static const float PI = 3.14159265;

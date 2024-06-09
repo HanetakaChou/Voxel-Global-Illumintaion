@@ -10,7 +10,6 @@
 
 #include "SceneRenderer.h"
 #include "Camera.h"
-#include "SDKmisc.h"
 #include <AntTweakBar.h>
 
 #if USE_D3D11
@@ -55,15 +54,20 @@ VXGI::IViewTracer *g_pGITracer = NULL;
 
 NVRHI::ConstantBufferRef g_pBuiltinGBufferParameters;
 
-static float g_fCameraClipNear = 1.0f;
-static float g_fCameraClipFar = 10000.0f;
-static float g_fVoxelSize = 8.0f;
+static float g_fCameraFOV = 1.0247777777F; // (static_cast<double>(XM_PIDIV2) - std::atan(1.7777777)) * 2.0
+static float g_fCameraAspectRatio = 1.7777777F;
+static float g_fCameraClipNear = 1.0F;
+static float g_fCameraClipFar = 1000.0F;
+static float g_fLightCameraFOV = XM_PI * 0.75F;
+static float g_fLightCameraAspectRatio = 1.0F;
+static float g_fLightCameraClipNear = 0.07F;
+static float g_fLightCameraClipFar = 777.0F;
+static float g_fVoxelSize = 1.0F;
 static float g_fAmbientScale = 0.0f;
 static float g_fDiffuseScale = 1.0f;
 static float g_fSpecularScale = 1.0f;
 static bool g_bEnableMultiBounce = true;
 static float g_fMultiBounceScale = 1.0f;
-static float g_fLightSize = 2500.0f;
 static bool g_bEnableGI = true;
 static bool g_bRenderHUD = true;
 static bool g_bInitialized = false;
@@ -319,27 +323,6 @@ class MainVisualController : public IVisualController
 {
     virtual LRESULT MsgProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) override
     {
-        g_LightCamera.HandleMessages(hWnd, uMsg, wParam, lParam);
-        g_Camera.HandleMessages(hWnd, uMsg, wParam, lParam);
-
-        if (uMsg == WM_KEYDOWN)
-        {
-            int iKeyPressed = static_cast<int>(wParam);
-
-            switch (iKeyPressed)
-            {
-            case VK_TAB:
-                g_bRenderHUD = !g_bRenderHUD;
-                return 0;
-                break;
-
-            case VK_SPACE:
-                g_RenderingMode = RenderingMode::NORMAL;
-                return 0;
-                break;
-            }
-        }
-
         return 1;
     }
 
@@ -347,9 +330,6 @@ class MainVisualController : public IVisualController
     {
         g_Camera.FrameMove((float)fElapsedTimeSeconds);
         g_LightCamera.FrameMove((float)fElapsedTimeSeconds);
-
-        XMVECTOR lightDir = g_LightCamera.GetLookAtPt() - g_LightCamera.GetEyePt();
-        g_pSceneRenderer->SetLightDirection(VXGI::float3(lightDir.m128_f32));
     }
 
     virtual void Render(RenderTargetView RTV) override
@@ -380,7 +360,10 @@ class MainVisualController : public IVisualController
             // because that function will voxelize the scene using the shadow map.
             // The coordinates passed to RenderShadowMap are at the center of the top opening of Sponza.
             // That's where the light's projection center will be.
-            g_pSceneRenderer->RenderShadowMap(VXGI::float3(-50.0f, 1300.0f, -40.0f), g_fLightSize, g_bDrawTransparent);
+            XMVECTOR lightPos = g_LightCamera.GetEyePt();
+            XMMATRIX lightViewMatrix = g_LightCamera.GetViewMatrix();
+            XMMATRIX lightProjMatrix = g_LightCamera.GetProjMatrix();
+            g_pSceneRenderer->RenderShadowMap(*reinterpret_cast<VXGI::float4*>(&lightPos), *reinterpret_cast<VXGI::float4x4*>(&lightViewMatrix), *reinterpret_cast<VXGI::float4x4*>(&lightProjMatrix), g_bDrawTransparent);
 
             g_pRendererInterface->debugEndEvent();
         }
@@ -648,18 +631,10 @@ class MainVisualController : public IVisualController
         if (FAILED(CreateVXGIObject()))
             return E_FAIL;
 
-        char strFileName[512];
-        if (FAILED(DXUTFindDXSDKMediaFileCch(strFileName, 512, "Sponza\\SponzaNoFlag.obj")))
+        if (FAILED(g_pSceneRenderer->LoadMesh("Sponza\\SponzaNoFlag.obj")))
             return E_FAIL;
 
-        if (FAILED(g_pSceneRenderer->LoadMesh(strFileName)))
-            return E_FAIL;
-
-        char strFileName2[512];
-        if (FAILED(DXUTFindDXSDKMediaFileCch(strFileName2, 512, "dragon.obj")))
-            return E_FAIL;
-
-        if (FAILED(g_pSceneRenderer->LoadTransparentMesh(strFileName2)))
+        if (FAILED(g_pSceneRenderer->LoadTransparentMesh("dragon.obj")))
             return E_FAIL;
 
         if (FAILED(g_pSceneRenderer->AllocateResources(g_pGI, g_pGICompiler)))
@@ -712,13 +687,10 @@ class MainVisualController : public IVisualController
         g_pSceneRenderer->AllocateViewDependentResources(width, height, sampleCount);
 
         // Setup the camera's projection parameters
-        float fAspectRatio = width / (FLOAT)height;
-        g_Camera.SetProjParams(XM_PIDIV4, fAspectRatio, g_fCameraClipNear, g_fCameraClipFar);
+        g_Camera.SetProjParams(g_fCameraFOV, g_fCameraAspectRatio, g_fCameraClipNear, g_fCameraClipFar);
 
         // Setup the light camera's projection params
-        g_LightCamera.SetProjParams(XM_PIDIV4, 1.0f, g_fCameraClipNear, g_fCameraClipFar);
-        g_LightCamera.SetWindow(width, height);
-        g_LightCamera.SetButtonMasks(MOUSE_RIGHT_BUTTON, MOUSE_WHEEL, MOUSE_RIGHT_BUTTON);
+        g_LightCamera.SetProjParams(g_fLightCameraFOV, g_fLightCameraAspectRatio, g_fLightCameraClipNear, g_fLightCameraClipFar);
     }
 };
 
@@ -752,16 +724,17 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, LPWSTR, int)
         return 1;
     }
 
-    XMVECTOR eyePt = XMVectorSet(230.0f, 175.0f, -40.0f, 0);
-    XMVECTOR lookAtPt = XMVectorSet(0.0f, 175.0f, -40.0f, 0);
-    g_Camera.SetViewParams(eyePt, lookAtPt);
-    g_Camera.SetScalers(0.005f, 500.0f);
-    g_Camera.SetRotateButtons(true, false, false, false);
+    XMVECTOR eyePt = XMVectorSet(0.0F, 100.F, 32.0F, 0.0F);
+    XMVECTOR lookAtPt = XMVectorSet(0.0F, 0.0F, 32.0F, 0.0F);
+    XMVECTOR up = XMVectorSet(0.0F, 0.0F, 1.0F, 0.0F);
+    g_Camera.SetViewParams(eyePt, lookAtPt, up);
+    g_Camera.SetProjParams(g_fCameraFOV, g_fCameraAspectRatio, g_fCameraClipNear, g_fCameraClipFar);
 
-    eyePt = XMVectorSet(20.0f, 30.0f, -2.0f, 0);
-    lookAtPt = XMVectorSet(0, 0, 0, 0);
-    g_LightCamera.SetViewParams(eyePt, lookAtPt);
-    g_LightCamera.SetScalers(0.00025f, 100.0f);
+    eyePt = XMVectorSet(0.0F, 0.0F, 66.0F, 0.0F);
+    lookAtPt = XMVectorSet(0.0F, 0.0F, 0.0F, 0.0F);
+    up = XMVectorSet(1.0F, 0.0F, 0.0F, 0.0F);
+    g_LightCamera.SetViewParams(eyePt, lookAtPt, up);
+    g_LightCamera.SetProjParams(g_fLightCameraFOV, g_fLightCameraAspectRatio, g_fLightCameraClipNear, g_fLightCameraClipFar);
 
     if (g_bInitialized)
         g_DeviceManager->MessageLoop();

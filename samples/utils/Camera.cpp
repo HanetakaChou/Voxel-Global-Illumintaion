@@ -199,9 +199,10 @@ CBaseCamera::CBaseCamera()
     // Set attributes for the view matrix
     XMVECTOR vEyePt = XMVectorReplicate(0);
     XMVECTOR vLookatPt = XMVectorSet(0, 0, 1, 0);
+    XMVECTOR vUp = XMVectorSet(0, 1, 0, 0);
 
     // Setup the view matrix
-    SetViewParams(vEyePt, vLookatPt);
+    SetViewParams(vEyePt, vLookatPt, vUp);
 
     // Setup the projection matrix
     SetProjParams(XM_PIDIV4, 1.0f, 1.0f, 1000.0f);
@@ -244,13 +245,13 @@ CBaseCamera::CBaseCamera()
 //--------------------------------------------------------------------------------------
 // Client can call this to change the position and direction of camera
 //--------------------------------------------------------------------------------------
-VOID CBaseCamera::SetViewParams(XMVECTOR vEyePt, XMVECTOR vLookatPt)
+VOID CBaseCamera::SetViewParams(XMVECTOR vEyePt, XMVECTOR vLookatPt, XMVECTOR vUp)
 {
     m_vDefaultEye = m_vEye = vEyePt;
     m_vDefaultLookAt = m_vLookAt = vLookatPt;
+    m_vDefaultUp = m_vUp = vUp;
 
     // Calc the view matrix
-    XMVECTOR vUp = XMVectorSet(0, 1, 0, 0);
     m_mView = XMMatrixLookAtLH(vEyePt, vLookatPt, vUp);
 
     XMVECTOR det;
@@ -657,7 +658,7 @@ D3DUtil_CameraKeys CBaseCamera::MapKey(UINT nKey)
 //--------------------------------------------------------------------------------------
 VOID CBaseCamera::Reset()
 {
-    SetViewParams(m_vDefaultEye, m_vDefaultLookAt);
+    SetViewParams(m_vDefaultEye, m_vDefaultLookAt, m_vUp);
 }
 
 //--------------------------------------------------------------------------------------
@@ -907,12 +908,11 @@ VOID CModelViewerCamera::Reset()
 //--------------------------------------------------------------------------------------
 // Override for setting the view parameters
 //--------------------------------------------------------------------------------------
-void CModelViewerCamera::SetViewParams(XMVECTOR vEyePt, XMVECTOR vLookatPt)
+void CModelViewerCamera::SetViewParams(XMVECTOR vEyePt, XMVECTOR vLookatPt, XMVECTOR vUp)
 {
-    CBaseCamera::SetViewParams(vEyePt, vLookatPt);
+    CBaseCamera::SetViewParams(vEyePt, vLookatPt, vUp);
 
     // Propogate changes to the member arcball
-    XMVECTOR vUp = XMVectorSet(0, 1, 0, 0);
     XMMATRIX mRotation = XMMatrixLookAtLH(vEyePt, vLookatPt, vUp);
     XMVECTOR quat = XMQuaternionRotationMatrix(mRotation);
     m_ViewArcBall.SetQuatNow(quat);
