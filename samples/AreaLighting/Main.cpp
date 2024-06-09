@@ -124,7 +124,8 @@ HRESULT CreateVXGIObject()
 
     VXGI::VoxelizationParameters voxelizationParams;
     voxelizationParams.ambientOcclusionMode = true;
-    voxelizationParams.persistentVoxelData = true;
+    // The **VXGI::VoxelizationParameters::persistentVoxelData** is always set to **false** in the **NVIDIA Unreal Engine 4 Fork**.
+    voxelizationParams.persistentVoxelData = false;
     voxelizationParams.mapSize = VXGI::uint3(g_nMapSize);
     voxelizationParams.stackLevels = g_nStackLevels;
     voxelizationParams.enabledHardwareFeatures = VXGI::HardwareFeatures::TYPED_UAV_LOAD;

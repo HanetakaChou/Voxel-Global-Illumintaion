@@ -108,7 +108,8 @@ VXGI::Status::Enum SetVoxelizationParameters()
     VXGI::VoxelizationParameters voxelizationParams;
     voxelizationParams.mapSize = VXGI::uint3(g_nMapSize);
     voxelizationParams.enableMultiBounce = g_bEnableMultiBounce;
-    voxelizationParams.persistentVoxelData = !g_bEnableMultiBounce;
+    // The **VXGI::VoxelizationParameters::persistentVoxelData** is always set to **false** in the **NVIDIA Unreal Engine 4 Fork**.
+    voxelizationParams.persistentVoxelData = false;
     voxelizationParams.useEmittanceInterpolation = g_bEnableMultiBounce;
     voxelizationParams.enabledHardwareFeatures = VXGI::HardwareFeatures::TYPED_UAV_LOAD;
 
@@ -353,22 +354,12 @@ class MainVisualController : public IVisualController
             {
                 XMVECTOR centerPt = eyePt + viewForward * g_fVoxelSize * float(g_nMapSize) * 0.5f;
 
-                static VXGI::Frustum lightFrusta[2];
-                lightFrusta[0] = g_pSceneRenderer->GetLightFrustum();
-
                 VXGI::UpdateVoxelizationParameters params;
                 params.clipmapAnchor = VXGI::float3(centerPt.m128_f32);
                 params.finestVoxelSize = g_fVoxelSize;
                 params.indirectIrradianceMapTracingParameters.irradianceScale = g_fMultiBounceScale;
                 params.indirectIrradianceMapTracingParameters.useAutoNormalization = true;
                 params.indirectIrradianceMapTracingParameters.lightLeakingAmount = VXGI::LightLeakingAmount::MODERATE;
-
-                if (memcmp(&lightFrusta[0], &lightFrusta[1], sizeof(VXGI::Frustum)) != 0)
-                {
-                    params.invalidatedFrustumCount = 2;
-                    params.invalidatedLightFrusta = lightFrusta;
-                    lightFrusta[1] = lightFrusta[0];
-                }
 
                 bool performOpacityVoxelization = false;
                 bool performEmittanceVoxelization = false;
