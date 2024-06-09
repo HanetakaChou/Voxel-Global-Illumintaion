@@ -453,6 +453,7 @@
     </FxCompile>
   </ItemGroup>
   <ItemGroup>
+    <None Include="shaders\GBufferLoader.hlsli" />
     <None Include="shaders\Shaders.hlsli" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

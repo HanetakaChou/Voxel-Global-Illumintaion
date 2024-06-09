@@ -433,6 +433,7 @@
     </FxCompile>
   </ItemGroup>
   <ItemGroup>
+    <None Include="shaders\GBufferLoader.hlsli" />
     <None Include="shaders\Shaders.hlsli" />
     <None Include="shaders\VoxelizationPS.hlsli" />
   </ItemGroup>

@@ -31,6 +31,9 @@ NVRHI::RendererInterfaceD3D12 *g_pRendererInterface = NULL;
 
 #endif
 
+#include "BindingHelpers.h"
+#include "shaders\GBufferLoader.hlsli"
+
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN 1
 #endif
@@ -48,7 +51,10 @@ DeviceManager *g_DeviceManager = NULL;
 SceneRenderer *g_pSceneRenderer = NULL;
 VXGI::IGlobalIllumination *g_pGI = NULL;
 VXGI::IShaderCompiler *g_pGICompiler = NULL;
-VXGI::IBasicViewTracer *g_pGITracer = NULL;
+VXGI::IUserDefinedShaderSet *g_GIGBufferLoader = NULL;
+VXGI::IViewTracer *g_pGITracer = NULL;
+
+NVRHI::ConstantBufferRef g_pBuiltinGBufferParameters;
 
 static float g_fCameraClipNear = 1.0f;
 static float g_fCameraClipFar = 10000.0f;
@@ -103,6 +109,13 @@ HRESULT CreateVXGIObject()
     VXGI::ShaderCompilerParameters comparams;
     comparams.errorCallback = &g_ErrorCallback;
     comparams.graphicsAPI = g_pRendererInterface->getGraphicsAPI();
+    // comparams.d3dCompilerDLLName = "d3dcompiler_hook.dll";
+#ifndef NDEBUG
+    comparams.d3dCompileFlags = D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;
+#else
+    comparams.d3dCompileFlags = D3DCOMPILE_OPTIMIZATION_LEVEL3;
+#endif
+    comparams.d3dCompileFlags2 = 0U;
 
     if (VXGI_FAILED(VFX_VXGI_CreateShaderCompiler(comparams, &g_pGICompiler)))
     {
@@ -116,7 +129,32 @@ HRESULT CreateVXGIObject()
         return E_FAIL;
     }
 
-    if (VXGI_FAILED(g_pGI->createBasicTracer(&g_pGITracer, g_pGICompiler)))
+    // Custom G-buffer Support
+    {
+        VXGI::ShaderResources resources;
+        resources.constantBufferCount = 1U;
+        resources.constantBufferSlots[0] = CBV_SLOT_BUILTIN_GBUFFER_PARAMETERS;
+        resources.textureCount = 4U;
+        resources.textureSlots[0] = SRV_SLOT_DEPTH_BUFFER;
+        resources.textureSlots[1] = SRV_SLOT_DEPTH_BUFFER_PREV;
+        resources.textureSlots[2] = SRV_SLOT_NORMAL_BUFFER;
+        resources.textureSlots[3] = SRV_SLOT_NORMAL_BUFFER_PREV;
+        resources.samplerCount = 0;
+
+        VXGI::IBlob *blob = nullptr;
+
+        if (VXGI_FAILED(g_pGICompiler->compileViewTracingShaders(&blob, g_GBufferLoader, sizeof(g_GBufferLoader), resources)))
+            return E_FAIL;
+
+        if (VXGI_FAILED(g_pGI->loadUserDefinedShaderSet(&g_GIGBufferLoader, blob->getData(), blob->getSize())))
+            return E_FAIL;
+
+        blob->dispose();
+    }
+
+    g_pBuiltinGBufferParameters = g_pRendererInterface->createConstantBuffer(NVRHI::ConstantBufferDesc(sizeof(BuiltinGBufferParameters), nullptr), nullptr);
+
+    if (VXGI_FAILED(g_pGI->createCustomTracer(&g_pGITracer, g_GIGBufferLoader)))
     {
         MessageBoxA(g_DeviceManager->GetHWND(), "Failed to create a VXGI tracer.", "VXGI Sample", MB_ICONERROR);
         return E_FAIL;
@@ -381,6 +419,33 @@ class MainVisualController : public IVisualController
         memcpy(&inputBuffers.viewMatrix, &viewMatrix, sizeof(viewMatrix));
         memcpy(&inputBuffers.projMatrix, &projMatrix, sizeof(projMatrix));
 
+        // Custom GBuffer Loader
+        BuiltinGBufferParameters builtinGBufferParameters;
+        builtinGBufferParameters.g_GBuffer.projMatrixInv = inputBuffers.projMatrix.invert();
+        builtinGBufferParameters.g_GBuffer.viewMatrixInv = inputBuffers.viewMatrix.invert();
+        builtinGBufferParameters.g_GBuffer.viewportOrigin = VXGI::float2(inputBuffers.gbufferViewport.minX, inputBuffers.gbufferViewport.minY);
+        builtinGBufferParameters.g_GBuffer.viewportSizeInv = VXGI::float2(1.0F / (inputBuffers.gbufferViewport.maxX - inputBuffers.gbufferViewport.minX), 1.0F / (inputBuffers.gbufferViewport.maxY - inputBuffers.gbufferViewport.minY));
+        builtinGBufferParameters.g_PreviousGBuffer.projMatrixInv = g_InputBuffersPrev.projMatrix.invert();
+        builtinGBufferParameters.g_PreviousGBuffer.viewMatrixInv = g_InputBuffersPrev.viewMatrix.invert();
+        builtinGBufferParameters.g_PreviousGBuffer.viewportOrigin = VXGI::float2(g_InputBuffersPrev.gbufferViewport.minX, g_InputBuffersPrev.gbufferViewport.minY);
+        builtinGBufferParameters.g_PreviousGBuffer.viewportSizeInv = VXGI::float2(1.0F / (g_InputBuffersPrev.gbufferViewport.maxX - g_InputBuffersPrev.gbufferViewport.minX), 1.0F / (g_InputBuffersPrev.gbufferViewport.maxY - g_InputBuffersPrev.gbufferViewport.minY));
+        g_pRendererInterface->writeConstantBuffer(g_pBuiltinGBufferParameters, &builtinGBufferParameters, sizeof(BuiltinGBufferParameters));
+
+        NVRHI::PipelineStageBindings gbufferBindings;
+        NVRHI::BindConstantBuffer(gbufferBindings, CBV_SLOT_BUILTIN_GBUFFER_PARAMETERS, g_pBuiltinGBufferParameters);
+        NVRHI::BindTexture(gbufferBindings, SRV_SLOT_DEPTH_BUFFER, inputBuffers.gbufferDepth, false, NVRHI::Format::UNKNOWN, 0U);
+        NVRHI::BindTexture(gbufferBindings, SRV_SLOT_DEPTH_BUFFER_PREV, g_InputBuffersPrev.gbufferDepth, false, NVRHI::Format::UNKNOWN, 0U);
+        NVRHI::BindTexture(gbufferBindings, SRV_SLOT_NORMAL_BUFFER, inputBuffers.gbufferNormal, false, NVRHI::Format::UNKNOWN, 0U);
+        NVRHI::BindTexture(gbufferBindings, SRV_SLOT_NORMAL_BUFFER_PREV, g_InputBuffersPrev.gbufferNormal, false, NVRHI::Format::UNKNOWN, 0U);
+
+        VXGI::int2 gbufferSize(static_cast<int>(inputBuffers.gbufferViewport.maxX - inputBuffers.gbufferViewport.minX), static_cast<int>(inputBuffers.gbufferViewport.maxY - inputBuffers.gbufferViewport.minY));
+
+        VXGI::IViewTracer::ViewInfo views[1];
+        views[0].extents.minX = static_cast<int>(inputBuffers.gbufferViewport.minX);
+        views[0].extents.maxX = static_cast<int>(inputBuffers.gbufferViewport.maxX);
+        views[0].extents.minY = static_cast<int>(inputBuffers.gbufferViewport.minY);
+        views[0].extents.maxY = static_cast<int>(inputBuffers.gbufferViewport.maxY);
+
         NVRHI::TextureHandle gbufferAlbedo = g_pSceneRenderer->GetAlbedoBufferHandle();
 
         if (g_bShowVoxels)
@@ -428,7 +493,7 @@ class MainVisualController : public IVisualController
                 areaLightParams.enableTemporalJitter = g_bTemporalFiltering;
                 areaLightParams.coplanarOffsetFactor = g_bOcclusionHack ? 0.f : 5.f;
 
-                g_pGITracer->computeAreaLightChannelsBasic(areaLightParams, inputBuffers, g_InputBuffersPrevValid ? &g_InputBuffersPrev : nullptr, &light, 1, areaLightDiffuse, areaLightSpecular);
+                g_pGITracer->computeAreaLightChannels(areaLightParams, gbufferBindings, gbufferSize, views, 1, &light, 1, areaLightDiffuse, areaLightSpecular);
 
                 g_pRendererInterface->debugEndEvent();
             }
@@ -504,8 +569,16 @@ class MainVisualController : public IVisualController
         if (g_pGI)
         {
             if (g_pGITracer)
+            {
                 g_pGI->destroyTracer(g_pGITracer);
-            g_pGITracer = NULL;
+                g_pGITracer = NULL;
+            }
+
+            if (g_GIGBufferLoader)
+            {
+                g_pGI->destroyUserDefinedShaderSet(g_GIGBufferLoader);
+                g_GIGBufferLoader = NULL;
+            }
 
             VFX_VXGI_DestroyGIObject(g_pGI);
             g_pGI = NULL;

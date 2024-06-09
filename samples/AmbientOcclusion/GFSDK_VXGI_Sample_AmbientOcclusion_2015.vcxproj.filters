@@ -143,5 +143,8 @@
     <None Include="shaders\VoxelizationPS.hlsli">
       <Filter>sample\AmbientOcclusion\shaders</Filter>
     </None>
+    <None Include="shaders\GBufferLoader.hlsli">
+      <Filter>sample\AmbientOcclusion\shaders</Filter>
+    </None>
   </ItemGroup>
 </Project>
