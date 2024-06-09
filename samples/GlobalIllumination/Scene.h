@@ -11,58 +11,49 @@
 #pragma once
 
 #include "Windows.h"
-#include "assimp/scene.h"
 #include "GFSDK_NVRHI.h"
 #include "GFSDK_VXGI_MathTypes.h"
 #include <vector>
-#include <map>
 
 struct VertexBufferEntry
 {
-    aiVector3D position;
-    aiVector2D texCoord;
-    aiVector3D normal;
-    aiVector3D tangent;
-    aiVector3D binormal;
+    VXGI::float3 position;
+    VXGI::float3 normal;
 };
 
 class Scene
 {
 protected:
-    aiScene *m_pScene;
     NVRHI::IRendererInterface *m_Renderer;
+
+    UINT m_numMeshes;
 
     std::vector<VXGI::Box3f> m_MeshBounds;
     VXGI::Box3f m_SceneBounds;
 
-    std::string m_ScenePath;
+    std::vector<UINT> m_IndexCounts;
+    std::vector<UINT> m_IndexOffsets;
+    std::vector<UINT> m_VertexOffsets;
+
+    std::vector<UINT> m_Indices;
+    std::vector<VertexBufferEntry> m_Vertices;
 
     NVRHI::BufferRef m_IndexBuffer;
     NVRHI::BufferRef m_VertexBuffer;
 
-    std::vector<UINT> m_IndexOffsets;
-    std::vector<UINT> m_VertexOffsets;
+    std::vector<VXGI::float3> m_BaseColors;
+    std::vector<float> m_MetallicValues;
+    std::vector<float> m_RoughnessValues;
 
-    std::vector<NVRHI::TextureHandle> m_DiffuseTextures;
-    std::vector<NVRHI::TextureHandle> m_SpecularTextures;
-    std::vector<NVRHI::TextureHandle> m_NormalsTextures;
-    std::vector<NVRHI::TextureHandle> m_OpacityTextures;
-    std::vector<NVRHI::TextureHandle> m_EmissiveTextures;
+    std::vector<NVRHI::ConstantBufferRef> m_MaterialBuffers;
 
-    std::vector<VXGI::float3> m_DiffuseColors;
-    std::vector<VXGI::float3> m_SpecularColors;
-    std::vector<VXGI::float3> m_EmissiveColors;
-
-    std::vector<UINT> m_MeshToSceneMapping;
-    std::map<std::string, NVRHI::TextureHandle> m_LoadedTextures;
-
-    NVRHI::TextureHandle LoadTextureFromFile(const char *name);
+    void UpdateBounds();
 
 public:
-    Scene()
-        : m_pScene(NULL), m_Renderer(NULL)
+    Scene() : m_numMeshes(0U), m_Renderer(NULL)
     {
     }
+
     virtual ~Scene()
     {
         Release();
@@ -71,27 +62,22 @@ public:
 
     VXGI::float4x4 m_WorldMatrix;
 
-    HRESULT Load(const char *fileName, UINT flags = 0);
+    HRESULT Load(const char *strFileName);
     HRESULT InitResources(NVRHI::IRendererInterface *pRenderer);
-    void UpdateBounds();
+
     void Release();
     void ReleaseResources();
 
-    const char *GetScenePath() { return m_ScenePath.c_str(); }
-
-    UINT GetMeshesNum() const { return m_pScene ? m_pScene->mNumMeshes : 0; }
-
-    VXGI::Box3f GetSceneBounds() const;
+    UINT GetMeshesNum() const { return m_numMeshes; }
 
     NVRHI::BufferHandle GetIndexBuffer() const { return m_IndexBuffer; }
     NVRHI::BufferHandle GetVertexBuffer() const { return m_VertexBuffer; }
 
     NVRHI::DrawArguments GetMeshDrawArguments(UINT meshID) const;
 
-    NVRHI::TextureHandle GetTextureSRV(aiTextureType type, UINT meshID) const;
-    VXGI::float3 GetColor(aiTextureType type, UINT meshID) const;
-    int GetMaterialIndex(UINT meshID) const;
+    int GetMaterialIndex(UINT meshID) const { return meshID; }
+    NVRHI::ConstantBufferRef GetMaterialBuffer(UINT meshID) const;
 
-    UINT GetMeshIndicesNum(UINT meshID) const;
+    VXGI::Box3f GetSceneBounds() const;
     VXGI::Box3f GetMeshBounds(UINT meshID) const;
 };

@@ -34,7 +34,7 @@ SceneRenderer::SceneRenderer(NVRHI::IRendererInterface *pRenderer)
 HRESULT SceneRenderer::LoadMesh(const char *strFileName)
 {
     m_pScene = new Scene();
-    HRESULT result = m_pScene->Load(strFileName, 0);
+    HRESULT result = m_pScene->Load(strFileName);
 
     if (FAILED(result))
     {
@@ -48,7 +48,7 @@ HRESULT SceneRenderer::LoadMesh(const char *strFileName)
 HRESULT SceneRenderer::LoadTransparentMesh(const char *strFileName)
 {
     m_pTransparentScene = new Scene();
-    HRESULT result = m_pTransparentScene->Load(strFileName, 0);
+    HRESULT result = m_pTransparentScene->Load(strFileName);
 
     if (FAILED(result))
     {
@@ -74,11 +74,7 @@ HRESULT SceneRenderer::AllocateResources(VXGI::IGlobalIllumination *pGI, VXGI::I
     const NVRHI::VertexAttributeDesc SceneLayout[] =
         {
             {"POSITION", 0, NVRHI::Format::RGB32_FLOAT, 0, offsetof(VertexBufferEntry, position), false},
-            {"TEXCOORD", 0, NVRHI::Format::RG32_FLOAT, 0, offsetof(VertexBufferEntry, texCoord), false},
-            {"NORMAL", 0, NVRHI::Format::RGB32_FLOAT, 0, offsetof(VertexBufferEntry, normal), false},
-            {"TANGENT", 0, NVRHI::Format::RGB32_FLOAT, 0, offsetof(VertexBufferEntry, tangent), false},
-            {"BINORMAL", 0, NVRHI::Format::RGB32_FLOAT, 0, offsetof(VertexBufferEntry, binormal), false},
-        };
+            {"NORMAL", 0, NVRHI::Format::RGB32_FLOAT, 0, offsetof(VertexBufferEntry, normal), false}};
 
     m_RendererInterface->createInputLayout(SceneLayout, _countof(SceneLayout), g_DefaultVS, sizeof(g_DefaultVS), &m_pInputLayout);
 
@@ -164,8 +160,9 @@ HRESULT SceneRenderer::CreateVoxelizationPS(VXGI::IShaderCompiler *pCompiler, VX
     // Enumerate resource slots (constant buffers, textures, samplers, potentially UAVs)
     // that are used by the user part of the voxelization pixel shader
     VXGI::ShaderResources resources;
-    resources.constantBufferCount = 1;
+    resources.constantBufferCount = 2;
     resources.constantBufferSlots[0] = 0;
+    resources.constantBufferSlots[1] = 1;
     resources.textureCount = 2;
     resources.textureSlots[0] = 0;
     resources.textureSlots[1] = 1;
@@ -191,8 +188,9 @@ HRESULT SceneRenderer::CreateTransparentGeometryPS(VXGI::IShaderCompiler *pCompi
     // Enumerate resource slots (constant buffers, textures, samplers, potentially UAVs)
     // that are used by the user part of the voxelization pixel shader
     VXGI::ShaderResources resources;
-    resources.constantBufferCount = 1;
+    resources.constantBufferCount = 2;
     resources.constantBufferSlots[0] = 0;
+    resources.constantBufferSlots[1] = 1;
 
     VXGI::IBlob *blob = nullptr;
 
@@ -223,18 +221,18 @@ void SceneRenderer::AllocateViewDependentResources(UINT width, UINT height, UINT
 
     gbufferDesc.format = NVRHI::Format::RGBA8_UNORM;
     gbufferDesc.clearValue = NVRHI::Color(0.f);
-    gbufferDesc.debugName = "GbufferAlbedo";
+    gbufferDesc.debugName = "GbufferC (BaseColor + Metallic)";
     m_RendererInterface->createTexture(gbufferDesc, NULL, &m_TargetAlbedo);
 
     gbufferDesc.format = NVRHI::Format::RGBA16_FLOAT;
     gbufferDesc.clearValue = NVRHI::Color(0.f);
-    gbufferDesc.debugName = "GbufferNormals";
+    gbufferDesc.debugName = "GbufferA (Normal + Roughness)";
     m_RendererInterface->createTexture(gbufferDesc, NULL, &m_TargetNormal);
     m_RendererInterface->createTexture(gbufferDesc, NULL, &m_TargetNormalPrev);
 
-    gbufferDesc.format = NVRHI::Format::D24S8;
+    gbufferDesc.format = NVRHI::Format::D32;
     gbufferDesc.clearValue = NVRHI::Color(1.f, 0.f, 0.f, 0.f);
-    gbufferDesc.debugName = "GbufferDepth";
+    gbufferDesc.debugName = "Depth";
     m_RendererInterface->createTexture(gbufferDesc, NULL, &m_TargetDepth);
     m_RendererInterface->createTexture(gbufferDesc, NULL, &m_TargetDepthPrev);
 }
@@ -275,38 +273,24 @@ void SceneRenderer::ReleaseViewDependentResources()
     m_TargetDepthPrev = nullptr;
 }
 
-void SceneRenderer::SetLightDirection(VXGI::float3 direction)
-{
-    m_LightDirection = direction.normalize();
-}
-
 XMVECTOR XMVectorSet(VXGI::float3 v)
 {
     return XMVectorSet(v.x, v.y, v.z, 0.f);
 }
 
-void SceneRenderer::RenderShadowMap(const VXGI::float3 cameraPosition, float lightSize, bool drawTransparent)
+void SceneRenderer::RenderShadowMap(const VXGI::float3 &lightPos, const VXGI::float4x4 &lightViewMatrix, const VXGI::float4x4 &lightProjMatrix, bool drawTransparent)
 {
-    const float lightRange = lightSize * 10.0f;
-
-    XMVECTOR lightPos = XMVectorSet(cameraPosition - m_LightDirection * lightRange * 0.5f);
-    XMVECTOR lookAt = XMVectorSet(cameraPosition);
-    XMVECTOR lightUp = XMVectorSet(0, 1.0f, 0, 0);
-
-    XMMATRIX viewMatrix = XMMatrixLookAtLH(lightPos, lookAt, lightUp);
-    XMMATRIX projMatrix = XMMatrixOrthographicLH(lightSize, lightSize, lightRange * 0.01f, lightRange);
-    XMMATRIX viewProjMatrix = viewMatrix * projMatrix;
-    memcpy(&m_LightViewMatrix, &viewMatrix, sizeof(viewMatrix));
-    memcpy(&m_LightProjMatrix, &projMatrix, sizeof(projMatrix));
-    memcpy(&m_LightViewProjMatrix, &viewProjMatrix, sizeof(viewProjMatrix));
+    m_LightPos = lightPos;
+    m_LightViewMatrix = lightViewMatrix;
+    m_LightProjMatrix = lightProjMatrix;
+    m_LightViewProjMatrix = (lightViewMatrix * lightProjMatrix);
 
     NVRHI::DrawCallState state;
-
     state.renderState.depthTarget = m_ShadowMap;
     state.renderState.clearDepthTarget = true;
     state.renderState.viewportCount = 1;
     state.renderState.viewports[0] = NVRHI::Viewport(float(s_ShadowMapSize), float(s_ShadowMapSize));
-    state.renderState.rasterState.cullMode = NVRHI::RasterState::CULL_NONE;
+    state.renderState.rasterState.frontCounterClockwise = true;
     state.renderState.rasterState.depthBias = 16;
     state.renderState.rasterState.slopeScaledDepthBias = 4.0f;
 
@@ -328,9 +312,7 @@ void SceneRenderer::RenderToGBuffer(const VXGI::float4x4 &viewProjMatrix, VXGI::
 
     MaterialCallback onChangeMaterial = [this, &state](const MeshMaterialInfo &material)
     {
-        NVRHI::BindTexture(state.PS, 0, material.diffuseTexture ? material.diffuseTexture : m_NullTexture, false, NVRHI::Format::UNKNOWN, ~0u);
-        NVRHI::BindTexture(state.PS, 1, material.specularTexture ? material.specularTexture : m_NullTexture, false, NVRHI::Format::UNKNOWN, ~0u);
-        NVRHI::BindTexture(state.PS, 2, material.normalsTexture ? material.normalsTexture : m_NullTexture, false, NVRHI::Format::UNKNOWN, ~0u);
+        NVRHI::BindConstantBuffer(state.PS, 1, material.materialBuffer);
     };
 
     state.PS.shader = m_pAttributesPS;
@@ -392,14 +374,12 @@ void SceneRenderer::RenderSceneCommon(
     MaterialCallback *onChangeMaterial,
     bool voxelization)
 {
-    static const UINT SRV_SLOT_DIFFUSE_TEXTURE = 0;
     static const UINT SRV_SLOT_SHADOW_MAP = 1;
 
     GlobalConstants globalConstants = constants;
     globalConstants.worldMatrix = pScene->m_WorldMatrix;
     globalConstants.lightMatrix = (VXGI::float4x4 &)m_LightViewProjMatrix;
-    globalConstants.lightDirection = (VXGI::float3 &)m_LightDirection;
-    globalConstants.diffuseColor = VXGI::float4(0.f);
+    globalConstants.lightPos = (VXGI::float3 &)m_LightPos;
     globalConstants.lightColor = VXGI::float4(1.f);
     globalConstants.rShadowMapSize = 1.0f / s_ShadowMapSize;
     m_RendererInterface->writeConstantBuffer(m_pGlobalCBuffer, &globalConstants, sizeof(globalConstants));
@@ -416,6 +396,8 @@ void SceneRenderer::RenderSceneCommon(
 
     state.VS.shader = m_pDefaultVS;
     NVRHI::BindConstantBuffer(state.VS, 0, m_pGlobalCBuffer);
+
+    state.renderState.rasterState.frontCounterClockwise = true;
 
     m_RendererInterface->beginRenderingPass();
 
@@ -478,18 +460,15 @@ void SceneRenderer::RenderSceneCommon(
                     state.GS = voxelizationState.GS;
                     state.PS = voxelizationState.PS;
                     state.renderState = voxelizationState.renderState;
-                    state.renderState.rasterState.frontCounterClockwise = true;
+                    state.renderState.rasterState.frontCounterClockwise = false;
 
                     NVRHI::BindTexture(state.PS, SRV_SLOT_SHADOW_MAP, m_ShadowMap);
                     NVRHI::BindSampler(state.PS, 0, m_pDefaultSamplerState);
                     NVRHI::BindSampler(state.PS, 1, m_pComparisonSamplerState);
                     NVRHI::BindConstantBuffer(state.PS, 0, m_pGlobalCBuffer);
-
-                    globalConstants.diffuseColor = VXGI::float4(materialInfo.diffuseColor, materialInfo.diffuseTexture ? 1.f : 0.f);
-                    m_RendererInterface->writeConstantBuffer(m_pGlobalCBuffer, &globalConstants, sizeof(globalConstants));
                 }
 
-                NVRHI::BindTexture(state.PS, SRV_SLOT_DIFFUSE_TEXTURE, materialInfo.diffuseTexture ? materialInfo.diffuseTexture : m_NullTexture, false, NVRHI::Format::UNKNOWN, ~0u);
+                NVRHI::BindConstantBuffer(state.PS, 1, materialInfo.materialBuffer);
             }
 
             if (onChangeMaterial)
@@ -527,11 +506,7 @@ void SceneRenderer::RenderForVoxelization(NVRHI::DrawCallState &state, VXGI::IGl
 
 void SceneRenderer::GetMaterialInfo(Scene *pScene, UINT meshID, OUT MeshMaterialInfo &materialInfo)
 {
-    materialInfo.diffuseTexture = pScene->GetTextureSRV(aiTextureType_DIFFUSE, meshID);
-    materialInfo.specularTexture = pScene->GetTextureSRV(aiTextureType_SPECULAR, meshID);
-    materialInfo.normalsTexture = pScene->GetTextureSRV(aiTextureType_NORMALS, meshID);
-
-    materialInfo.diffuseColor = pScene->GetColor(aiTextureType_DIFFUSE, meshID);
+    materialInfo.materialBuffer = pScene->GetMaterialBuffer(meshID);
 
     materialInfo.geometryShader = m_pVoxelizationGS;
     materialInfo.pixelShader = m_pVoxelizationPS;
@@ -578,7 +553,7 @@ void SceneRenderer::Shade(NVRHI::TextureHandle indirectDiffuse, NVRHI::TextureHa
     CB.viewProjMatrix = viewProjMatrix;
     CB.viewProjMatrixInv = viewProjMatrix.invert();
     CB.lightMatrix = m_LightViewProjMatrix;
-    CB.lightDirection = m_LightDirection;
+    CB.lightPos = m_LightPos;
     CB.lightColor = VXGI::float4(1.f);
     CB.ambientColor = ambientColor;
     CB.rShadowMapSize = 1.0f / s_ShadowMapSize;

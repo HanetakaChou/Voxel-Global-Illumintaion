@@ -578,7 +578,8 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, LPWSTR, int)
 
     XMVECTOR eyePt = XMVectorSet(0.0f, 100.0f, 50.0f, 0);
     XMVECTOR lookAtPt = XMVectorSet(-100.0f, 100.0f, 50.0f, 0);
-    g_Camera.SetViewParams(eyePt, lookAtPt);
+    XMVECTOR up = XMVectorSet(0.0f, 1.0f, 0.0f, 0);
+    g_Camera.SetViewParams(eyePt, lookAtPt, up);
     g_Camera.SetScalers(0.005f, 500.0f);
     g_Camera.SetRotateButtons(true, false, false, false);
 

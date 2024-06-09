@@ -19,8 +19,8 @@
     <ClCompile Include="SceneRenderer.cpp">
       <Filter>sample\GlobalIllumination</Filter>
     </ClCompile>
-    <ClCompile Include="..\utils\SDKmisc.cpp">
-      <Filter>sample\utils</Filter>
+    <ClCompile Include="..\assets\cornell_box.cpp">
+      <Filter>assets</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -51,8 +51,8 @@
     <ClInclude Include="..\..\VXGI\include\GFSDK_VXGI_MathTypes.h">
       <Filter>VXGI\include</Filter>
     </ClInclude>
-    <ClInclude Include="..\utils\SDKmisc.h">
-      <Filter>sample\utils</Filter>
+    <ClInclude Include="..\assets\cornell_box.h">
+      <Filter>assets</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -89,6 +89,9 @@
     <Filter Include="sample\utils">
       <UniqueIdentifier>{7ffac5d5-efb1-4169-a21c-9c41f36258fc}</UniqueIdentifier>
     </Filter>
+    <Filter Include="assets">
+      <UniqueIdentifier>{8d4be663-ac9a-495b-9cfb-1508690960b4}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="shaders\TransparentGeometryPS.hlsli">
@@ -105,20 +108,8 @@
     <CopyFileToFolders Include="..\..\VXGI\bin\GFSDK_VXGI_x64.dll">
       <Filter>VXGI\bin</Filter>
     </CopyFileToFolders>
-    <CopyFileToFolders Include="..\thirdparty\FreeImage\x64\FreeImage.dll">
-      <Filter>sample\thirdparty\x64</Filter>
-    </CopyFileToFolders>
-    <CopyFileToFolders Include="..\thirdparty\assimp\lib\x64\assimp.dll">
-      <Filter>sample\thirdparty\x64</Filter>
-    </CopyFileToFolders>
     <CopyFileToFolders Include="..\thirdparty\AntTweakBar\lib\AntTweakBar64.dll">
       <Filter>sample\thirdparty\x64</Filter>
-    </CopyFileToFolders>
-    <CopyFileToFolders Include="..\thirdparty\FreeImage\x86\FreeImage.dll">
-      <Filter>sample\thirdparty\x86</Filter>
-    </CopyFileToFolders>
-    <CopyFileToFolders Include="..\thirdparty\assimp\lib\x86\assimp.dll">
-      <Filter>sample\thirdparty\x86</Filter>
     </CopyFileToFolders>
     <CopyFileToFolders Include="..\thirdparty\AntTweakBar\lib\AntTweakBar.dll">
       <Filter>sample\thirdparty\x86</Filter>

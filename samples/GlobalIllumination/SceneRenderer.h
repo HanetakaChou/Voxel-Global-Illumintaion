@@ -23,8 +23,7 @@ __declspec(align(16)) struct GlobalConstants
     VXGI::float4x4 viewProjMatrixInv;
     VXGI::float4x4 lightMatrix;
     VXGI::float4 cameraPos;
-    VXGI::float4 lightDirection;
-    VXGI::float4 diffuseColor;
+    VXGI::float4 lightPos;
     VXGI::float4 lightColor;
     VXGI::float4 ambientColor;
     float rShadowMapSize;
@@ -36,15 +35,9 @@ __declspec(align(16)) struct GlobalConstants
 
 struct MeshMaterialInfo : public VXGI::MaterialInfo
 {
-    NVRHI::TextureHandle diffuseTexture;
-    NVRHI::TextureHandle specularTexture;
-    NVRHI::TextureHandle normalsTexture;
-    VXGI::float3 diffuseColor;
+    NVRHI::ConstantBufferRef materialBuffer;
 
-    MeshMaterialInfo() : diffuseTexture(NULL),
-                         specularTexture(NULL),
-                         normalsTexture(NULL),
-                         diffuseColor(0.f)
+    MeshMaterialInfo()
     {
     }
 };
@@ -76,7 +69,7 @@ private:
     UINT m_Height;
     UINT m_SampleCount;
 
-    VXGI::float3 m_LightDirection;
+    VXGI::float4 m_LightPos;
     VXGI::float4x4 m_LightViewMatrix;
     VXGI::float4x4 m_LightProjMatrix;
     VXGI::float4x4 m_LightViewProjMatrix;
@@ -114,8 +107,7 @@ public:
     void RenderToGBuffer(const VXGI::float4x4 &viewProjMatrix, VXGI::float3 cameraPos, bool drawTransparent);
     void RenderTransparentScene(VXGI::IGlobalIllumination *pGI, NVRHI::TextureHandle pDest, const VXGI::float4x4 &viewProjMatrix, VXGI::float3 cameraPos, float transparentRoughness, float transparentReflectance);
 
-    void SetLightDirection(VXGI::float3 direction);
-    void RenderShadowMap(const VXGI::float3 cameraPosition, float lightSize, bool drawTransparent);
+    void RenderShadowMap(const VXGI::float3 &lightPos, const VXGI::float4x4 &lightViewMatrix, const VXGI::float4x4 &lightProjMatrix, bool drawTransparent);
 
     void GetMaterialInfo(Scene *pScene, UINT meshID, OUT MeshMaterialInfo &materialInfo);
 
