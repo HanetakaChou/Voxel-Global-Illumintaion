@@ -34,6 +34,9 @@
     <ClCompile Include="..\utils\SDKmisc.cpp">
       <Filter>samples\utils</Filter>
     </ClCompile>
+    <ClCompile Include="..\assets\cornell_box.cpp">
+      <Filter>samples\assets</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\VXGI\examplecode\GFSDK_NVRHI_OpenGL4.h">
@@ -80,6 +83,9 @@
     </ClInclude>
     <ClInclude Include="..\utils\SDKmisc.h">
       <Filter>samples\utils</Filter>
+    </ClInclude>
+    <ClInclude Include="..\assets\cornell_box.h">
+      <Filter>samples\assets</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -133,6 +139,9 @@
     </Filter>
     <Filter Include="samples\GlobalIllumination\shaders\GL">
       <UniqueIdentifier>{492fbd3f-1198-41fe-894e-76ad8ab5e769}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="samples\assets">
+      <UniqueIdentifier>{86d3414c-c550-44be-8c10-dcd8d3a8017f}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>

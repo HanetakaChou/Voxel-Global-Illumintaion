@@ -486,6 +486,7 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug-D3D11|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release-D3D11|x64'">true</ExcludedFromBuild>
     </ClCompile>
+    <ClCompile Include="..\assets\cornell_box.cpp" />
     <ClCompile Include="..\utils\Camera.cpp" />
     <ClCompile Include="..\utils\DeviceManager11.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug-D3D11|Win32'">false</ExcludedFromBuild>
@@ -530,6 +531,7 @@
     <ClInclude Include="..\..\VXGI\include\GFSDK_NVRHI.h" />
     <ClInclude Include="..\..\VXGI\include\GFSDK_VXGI.h" />
     <ClInclude Include="..\..\VXGI\include\GFSDK_VXGI_MathTypes.h" />
+    <ClInclude Include="..\assets\cornell_box.h" />
     <ClInclude Include="..\utils\Camera.h" />
     <ClInclude Include="..\utils\DeviceManager11.h" />
     <ClInclude Include="..\utils\DeviceManagerGL4.h" />
