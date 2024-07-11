@@ -1,0 +1,7 @@
+#vert light_injection.vert
+#include "light_injection.hlsli"
+#end
+
+#frag light_injection.frag
+#include "light_injection.hlsli"
+#end
