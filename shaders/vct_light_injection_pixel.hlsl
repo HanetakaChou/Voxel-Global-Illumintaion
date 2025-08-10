@@ -21,7 +21,7 @@
 
 // \[Takeshige 2015\] [Masaya Takeshige. "The Basics of GPU Voxelization." NVIDIA GameWorks Blog 2015.](https://developer.nvidia.com/content/basics-gpu-voxelization)
 // the same pixel may intersecting multiple voxels in the viewport depth direction
-#define MAX_VOXEL_COUNT 3
+#define INTERNAL_MAX_VOXEL_COUNT 3
 
 void main(
 	in uint in_sample_mask : SV_Coverage,
@@ -36,13 +36,13 @@ void main(
 	float pixel_clipmap_texel_space_viewport_y_direction_component = float(VCT_CLIPMAP_SIZE) - in_position.y;
 	float pixel_clipmap_texel_space_viewport_depth_direction_component = in_position.z * float(VCT_CLIPMAP_SIZE);
 
-	float voxel_clipmap_texel_space_viewport_depth_direction_component_relatives[MAX_VOXEL_COUNT] = {-0.5, 0.5, 1.5};
-	int voxel_clipmap_texel_space_viewport_depth_direction_component_offsets[MAX_VOXEL_COUNT] = {-1, 0, 1};
+	float voxel_clipmap_texel_space_viewport_depth_direction_component_relatives[INTERNAL_MAX_VOXEL_COUNT] = {-0.5, 0.5, 1.5};
+	int voxel_clipmap_texel_space_viewport_depth_direction_component_offsets[INTERNAL_MAX_VOXEL_COUNT] = {-1, 0, 1};
 
-	float voxel_opacity_sample_scales[MAX_VOXEL_COUNT];
+	float voxel_opacity_sample_scales[INTERNAL_MAX_VOXEL_COUNT];
 	{
 		[unroll]
-		for (int voxel_index = 0; voxel_index < MAX_VOXEL_COUNT; ++voxel_index)
+		for (int voxel_index = 0; voxel_index < INTERNAL_MAX_VOXEL_COUNT; ++voxel_index)
 		{
 			voxel_opacity_sample_scales[voxel_index] = 0.0;
 		}
@@ -98,7 +98,7 @@ void main(
 					float sample_clipmap_texel_space_viewport_depth_direction_component_relative = pixel_clipmap_texel_space_viewport_depth_direction_component_fraction + dot(delta_pixel_clipmap_texel_space_viewport_depth_direction, sample_positions[sample_index]);
 
 					[unroll]
-					for (int voxel_index = 0; voxel_index < MAX_VOXEL_COUNT; ++voxel_index)
+					for (int voxel_index = 0; voxel_index < INTERNAL_MAX_VOXEL_COUNT; ++voxel_index)
 					{
 						voxel_opacity_sample_scales[voxel_index] += (1.0 / float(VCT_VOXELIZATION_SAMPLE_COUNT)) * saturate(1.0 - abs(sample_clipmap_texel_space_viewport_depth_direction_component_relative - voxel_clipmap_texel_space_viewport_depth_direction_component_relatives[voxel_index]));
 					}
@@ -142,7 +142,7 @@ void main(
 	}
 
 	[unroll]
-	for (int voxel_index = 0; voxel_index < MAX_VOXEL_COUNT; ++voxel_index)
+	for (int voxel_index = 0; voxel_index < INTERNAL_MAX_VOXEL_COUNT; ++voxel_index)
 	{
 		float voxel_opacity = saturate(voxel_opacity_sample_scales[voxel_index] * voxel_opacity_area_scale);
 		
