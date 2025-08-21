@@ -1,0 +1,867 @@
+//
+// Copyright (C) YuqiaoZhang(HanetakaChou)
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Lesser General Public License as published
+// by the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Lesser General Public License for more details.
+//
+// You should have received a copy of the GNU Lesser General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+//
+
+#ifndef _BRX_VOXEL_CONE_TRACING_CONE_TRACING_COMPUTE_BSLI_
+#define _BRX_VOXEL_CONE_TRACING_CONE_TRACING_COMPUTE_BSLI_ 1
+
+brx_float VxgiSqr(brx_float x) { return x * x; }
+
+brx_float VxgiGetMinDistanceToBoundaryInVoxels(brx_float3 position)
+{
+    const brx_float clipmap_boundary = brx_float(BRX_VCT_CLIPMAP_FINEST_VOXEL_SIZE) * brx_float(1 << (int(BRX_VCT_CLIPMAP_STACK_LEVEL_COUNT) - 1)) * (brx_float(BRX_VCT_CLIPMAP_MAP_SIZE) * 0.5 - 0.5);
+
+    brx_float3 distance_from_anchor = abs(position - g_VxgiAbstractTracingCB.ClipmapAnchor.xyz);
+    brx_float max_distance_from_anchor = max(distance_from_anchor.x, max(distance_from_anchor.y, distance_from_anchor.z));
+    brx_float min_distance_to_boundary = clipmap_boundary - max_distance_from_anchor;
+    return min_distance_to_boundary;
+}
+
+brx_float VxgiGetMinSampleSizeInVoxels(brx_float3 position)
+{
+    const brx_float clipmap_level_0_boundary = brx_float(BRX_VCT_CLIPMAP_FINEST_VOXEL_SIZE) * (brx_float(BRX_VCT_CLIPMAP_MAP_SIZE) * 0.5 - 8.0);
+
+    brx_float3 distance_from_anchor = abs(position - g_VxgiAbstractTracingCB.ClipmapAnchor.xyz);
+    brx_float max_distance_from_anchor = max(distance_from_anchor.x, max(distance_from_anchor.y, distance_from_anchor.z));
+    brx_float max_relative_distance_from_anchor = max_distance_from_anchor * (1.0 / clipmap_level_0_boundary);
+    brx_float min_sample_size = max(2 * max_relative_distance_from_anchor, 1);
+    return min_sample_size;
+}
+
+void VxgiGetLevelCoordinates(brx_float3 position, brx_int integer_level, bool smoothSampling, out brx_float3 opacityCoords, out brx_float3 emittanceCoords)
+{
+    brx_float4 translationParams1 = g_VxgiTranslationParameters1[integer_level];
+
+    // toroidal offset
+    brx_float4 translationParams2 = g_VxgiTranslationParameters2[integer_level];
+
+    brx_float clipmap_level_boundary = brx_float(BRX_VCT_CLIPMAP_FINEST_VOXEL_SIZE) * brx_float(1u << brx_min(integer_level, (brx_int(BRX_VCT_CLIPMAP_STACK_LEVEL_COUNT) - 1))) * brx_float(BRX_VCT_CLIPMAP_MAP_SIZE);
+
+    // ( ... / (clipmap_level_boundary * 0.5)) * 0.5 + 0.5
+    // = ... / clipmap_level_boundary + 0.5
+    brx_float3 positionInClipmap = (position - g_VxgiAbstractTracingCB.ClipmapCenter.xyz) / clipmap_level_boundary + 0.5;
+
+    // toroidal offset
+    brx_float3 fVoxelCoord = frac(positionInClipmap + translationParams2.xyz);
+
+    brx_float clipmap_level_map_size = BRX_VCT_CLIPMAP_MAP_SIZE / (1u << brx_max(0, (integer_level - (brx_int(BRX_VCT_CLIPMAP_STACK_LEVEL_COUNT) - 1))));
+
+    brx_float3 iVoxelCoord = fVoxelCoord * clipmap_level_map_size;
+
+    if (smoothSampling)
+    {
+        brx_float3 uv = iVoxelCoord + 0.5;
+        brx_float3 iuv = floor(uv);
+        brx_float3 fuv = frac(uv);
+        uv = iuv + fuv * fuv * (3.0 - 2.0 * fuv);
+
+        iVoxelCoord = uv - 0.5;
+    }
+
+    uint opacity_width;
+    uint opacity_height;
+    uint opacity_depth;
+    t_Opacity.GetDimensions(opacity_width, opacity_height, opacity_depth);
+
+    opacityCoords = (iVoxelCoord + brx_float3(0, 0, translationParams1.x)) * brx_float3(1.0 / brx_float(opacity_width), 1.0 / brx_float(opacity_height), 1.0 / brx_float(opacity_depth));
+
+    uint emittance_width;
+    uint emittance_height;
+    uint emittance_depth;
+    t_EmittanceEven.GetDimensions(emittance_width, emittance_height, emittance_depth);
+
+    emittanceCoords = (iVoxelCoord + brx_float3(2, 0, translationParams1.y)) * brx_float3(1.0 / brx_float(emittance_width), 1.0 / brx_float(emittance_height), 1.0 / brx_float(emittance_depth));
+}
+
+brx_float VxgiSampleOpacityTextures(brx_float3 coords, out bool sampleEmittance)
+{
+    brx_float opacity;
+    brx_float4 pos = t_Opacity.SampleLevel(s_VoxelTextureSampler, coords, 0);
+
+    opacity = pos.x;
+
+    sampleEmittance = pos.w != 0 ? true : false;
+
+    return opacity;
+}
+
+brx_float3 VxgiSampleEmittanceTextures(brx_float3 coords, brx_float3 direction, bool isOdd)
+{
+    // PBR Book V3: [Figure 14.14](https://pbr-book.org/3ed-2018/Light_Transport_I_Surface_Reflection/The_Light_Transport_Equation#BasicDerivation)
+    // PBR Book V4: [Figure 13.1](https://pbr-book.org/4ed/Light_Transport_I_Surface_Reflection/The_Light_Transport_Equation)
+    // L_current = - V_previous
+    brx_float offsetX = direction.x >= 0.0 ? 3 : 0;
+    brx_float offsetY = direction.y >= 0.0 ? 4 : 1;
+    brx_float offsetZ = direction.z >= 0.0 ? 5 : 2;
+
+    brx_float3 coordsX = coords + brx_float3(offsetX * g_VxgiAbstractTracingCB.EmittancePackingStride, 0, 0);
+    brx_float3 coordsY = coords + brx_float3(offsetY * g_VxgiAbstractTracingCB.EmittancePackingStride, 0, 0);
+    brx_float3 coordsZ = coords + brx_float3(offsetZ * g_VxgiAbstractTracingCB.EmittancePackingStride, 0, 0);
+
+    brx_float3 emittanceX;
+    brx_float3 emittanceY;
+    brx_float3 emittanceZ;
+    if (isOdd)
+    {
+        emittanceX = t_EmittanceOdd.SampleLevel(s_VoxelTextureSampler, coordsX, 0).rgb;
+        emittanceY = t_EmittanceOdd.SampleLevel(s_VoxelTextureSampler, coordsY, 0).rgb;
+        emittanceZ = t_EmittanceOdd.SampleLevel(s_VoxelTextureSampler, coordsZ, 0).rgb;
+    }
+    else
+    {
+        emittanceX = t_EmittanceEven.SampleLevel(s_VoxelTextureSampler, coordsX, 0).rgb;
+        emittanceY = t_EmittanceEven.SampleLevel(s_VoxelTextureSampler, coordsY, 0).rgb;
+        emittanceZ = t_EmittanceEven.SampleLevel(s_VoxelTextureSampler, coordsZ, 0).rgb;
+    }
+
+    // TODO:
+    // we view the voxel as 3x3 octahedral map
+    brx_float3 abs_direction = abs(direction);
+    brx_float manhattan_norm = abs_direction.x + abs_direction.y + abs_direction.z;
+    brx_float weight_x = abs_direction.x / manhattan_norm;
+    brx_float weight_y = abs_direction.y / manhattan_norm;
+    brx_float weight_z = abs_direction.z / manhattan_norm;
+
+    return emittanceX * weight_x + emittanceY * weight_y + emittanceZ * weight_z;
+}
+
+void VxgiCalculateSampleParameters(brx_float t, brx_float coneFactor, brx_float tracingStep, brx_float minSampleSize, out brx_float tStep, out brx_float fLevel, out brx_float sampleSize)
+{
+    // Real-Time Rendering Fourth Edition "Figure 11.12" cone tracing is approximated by performing a series of intersections between scene geometry and spheres of increasing radius
+    //
+    // The front edge of the current sphere should exactly touch the rear edge of the next sphere's footprint
+    //
+    // t_n_1 - r_n_1 = t_n + r_n
+    //
+    // case 1
+    // r_n = cone_factor * 0.5 * t_n
+    // r_n_1 = cone_factor * 0.5 * t_n_1
+    //
+    // t_n_1 - cone_factor * 0.5 * t_n_1 = t_n + cone_factor * 0.5 * t_n
+    // => t_n_1 * (1 - cone_factor * 0.5) = t_n * (1 + cone_factor * 0.5)
+    // => t_n_1 = (1 + cone_factor * 0.5) / (1 - cone_factor * 0.5) * t_n = (2.0 * t_n + cone_factor) / (2.0 - coneFactor)
+    //
+    // Delta_t = t_n_1 - t_n = (2.0 * t_n + cone_factor) / (2.0 - coneFactor) - t_n
+    //
+    // case 2
+    // r_n = minSampleSize * 0.5
+    // r_n_1 = cone_factor * 0.5 * t_n_1
+    //
+    // t_n_1 - cone_factor * 0.5 * t_n_1 = t_n + minSampleSize * 0.5
+    // =>  t_n_1 = (t_n + minSampleSize * 0.5) / (1.0 - cone_factor * 0.5) = (2.0 * t_n + minSampleSize) / (2.0 - coneFactor)
+    //
+    // Delta_t = t_n_1 - t_n = (2.0 * t_n + minSampleSize) / (2.0 - coneFactor) - t_n
+    //
+    // case 3
+    // r_n = minSampleSize * 0.5
+    // r_n_1 = minSampleSize * 0.5
+    //
+    // t_n_1 - minSampleSize * 0.5  = t_n + minSampleSize * 0.5
+    // => t_n_1 = t_n + minSampleSize
+    //
+    // Delta_t = t_n_1 - t_n = t_n + minSampleSize - t_n
+
+    brx_float cone_ratio = coneFactor;
+
+    brx_float cone_current_height = t;
+
+    brx_float minimum_cone_diameter = minSampleSize;
+
+    // -------
+
+    brx_float cone_current_diameter = max(minimum_cone_diameter, cone_ratio * cone_current_height);
+
+    brx_float cone_next_height = max(cone_current_height + minimum_cone_diameter, (2.0 * cone_current_height + cone_current_diameter) / max(1E-5, 2.0 - cone_ratio));
+
+    tStep = cone_next_height - cone_current_height;
+
+    // -------
+
+    sampleSize = cone_current_diameter;
+
+    tStep *= tracingStep;
+
+    fLevel = log2(sampleSize);
+}
+
+void VxgiSampleVoxelData(brx_float3 curPosition, brx_float fLevel, brx_float3 direction, brx_float weight, bool smoothSampling, out brx_float opacity, out brx_float3 emittance, out bool anyEmittance)
+{
+    brx_int integer_level = fLevel;
+    brx_float fraction_level = fLevel - integer_level;
+    brx_float weight_low = (1.0 - fraction_level) * weight;
+    brx_float weight_high = ((integer_level + 1) < (brx_int(BRX_VCT_CLIPMAP_STACK_LEVEL_COUNT) + brx_int(BRX_VCT_CLIPMAP_MIP_LEVEL_COUNT))) ? fraction_level * weight : 0.0;
+
+    brx_float3 opacityCoords1;
+    brx_float3 emittanceCoords1;
+    brx_float3 opacityCoords2;
+    brx_float3 emittanceCoords2;
+    VxgiGetLevelCoordinates(curPosition, integer_level, smoothSampling, opacityCoords1, emittanceCoords1);
+    VxgiGetLevelCoordinates(curPosition, integer_level + 1, smoothSampling, opacityCoords2, emittanceCoords2);
+
+    bool sampleEmittance1;
+    bool sampleEmittance2;
+    opacity = VxgiSampleOpacityTextures(opacityCoords1, sampleEmittance1) * weight_low + VxgiSampleOpacityTextures(opacityCoords2, sampleEmittance2) * weight_high;
+
+    emittance = brx_float3(0, 0, 0);
+    anyEmittance = false;
+
+    brx_float voxel_size_low = brx_float(BRX_VCT_CLIPMAP_FINEST_VOXEL_SIZE) * brx_float(1u << integer_level);
+    brx_float voxel_size_high = voxel_size_low * 2.0;
+    
+    brx_float factor_low = voxel_size_low * voxel_size_low * weight_low;
+    brx_float factor_high = voxel_size_high * voxel_size_high * weight_high;
+
+    if ((integer_level & 1) != 0)
+    {
+        {
+            brx_float temp = factor_high;
+            factor_high = factor_low;
+            factor_low = temp;
+        };
+        {
+            brx_float3 temp = emittanceCoords1;
+            emittanceCoords1 = emittanceCoords2;
+            emittanceCoords2 = temp;
+        };
+        {
+            bool temp = sampleEmittance1;
+            sampleEmittance1 = sampleEmittance2;
+            sampleEmittance2 = temp;
+        };
+    }
+
+    if (sampleEmittance1)
+    {
+        emittance = VxgiSampleEmittanceTextures(emittanceCoords1, direction, false) * factor_low;
+        anyEmittance = true;
+    }
+
+    if (sampleEmittance2 && factor_high > 0.0)
+    {
+        emittance += VxgiSampleEmittanceTextures(emittanceCoords2, direction, true) * factor_high;
+        anyEmittance = true;
+    }
+}
+
+struct VxgiConeTracingArguments
+{
+    brx_float3 firstSamplePosition;
+    brx_float3 direction;
+    brx_float coneFactor;
+    brx_float tracingStep;
+    brx_float firstSampleT;
+    brx_float maxTracingDistance;
+    brx_float ambientAttenuationFactor;
+    bool enableSceneBoundsCheck;
+};
+
+VxgiConeTracingArguments VxgiDefaultConeTracingArguments()
+{
+    VxgiConeTracingArguments args;
+    args.firstSamplePosition = brx_float3(0, 0, 0);
+    args.direction = brx_float3(1, 0, 0);
+    args.coneFactor = 1.0;
+    args.tracingStep = 1.0;
+    args.firstSampleT = 1.0;
+    args.maxTracingDistance = 0.0;
+    args.ambientAttenuationFactor = 0.0;
+    args.enableSceneBoundsCheck = true;
+    return args;
+}
+
+struct VxgiConeTracingResults
+{
+    brx_float3 radiance;
+    brx_float ambient;
+    brx_float finalOpacity;
+};
+
+// TODO
+// 128
+#define INTERNAL_BRX_VCT_CONE_TRACING_MAXIMUM_ITERATION_COUNT 32
+
+brx_float K(brx_float a, brx_float t)
+{
+    // normalized kernel k = a * exp (- a * t)
+    // antiderivative K = - exp (-a * t)
+    //
+    // we have multiple intersection (weighted by "transparency") within the same direction
+    // use the normalized kernel to combine them together
+
+    return -exp(-a * t);
+}
+
+// TODO
+// 1e-4
+#define INTERNAL_BRX_VCT_CONE_TRACING_TRANSPARENCY_THRESHOLD 1e-3
+
+VxgiConeTracingResults VxgiTraceCone(VxgiConeTracingArguments args, bool enable_radiance, bool enable_ambient)
+{
+    brx_float transparency = 1.0;
+
+    brx_float3 cone_radiance = brx_float3(0, 0, 0);
+
+    // \int a * \exp (-a t) T(t)  dt
+    // occlusion contribution varies by distance
+    brx_float cone_ambient = 0.0;
+
+    // K(0) = -1
+    brx_float prev_ambient_factor = -1.0;
+
+    brx_float3 curPosition = args.firstSamplePosition;
+    brx_float t = args.firstSampleT;
+
+    brx_float3 direction = args.direction;
+
+    brx_float maxT = args.maxTracingDistance / BRX_VCT_CLIPMAP_FINEST_VOXEL_SIZE;
+
+    brx_loop for (brx_int _unused_iteration_index = 0; _unused_iteration_index < brx_int(INTERNAL_BRX_VCT_CONE_TRACING_MAXIMUM_ITERATION_COUNT); ++_unused_iteration_index)
+    {
+        brx_float minDistanceToBoundary = VxgiGetMinDistanceToBoundaryInVoxels(curPosition);
+        brx_float minSampleSize = VxgiGetMinSampleSizeInVoxels(curPosition);
+
+        brx_float tStep;
+        brx_float fLevel;
+        brx_float sampleSize;
+        VxgiCalculateSampleParameters(t, args.coneFactor, args.tracingStep, minSampleSize, tStep, fLevel, sampleSize);
+
+        if (fLevel >= brx_float(brx_int(BRX_VCT_CLIPMAP_STACK_LEVEL_COUNT) + brx_int(BRX_VCT_CLIPMAP_MIP_LEVEL_COUNT)) || (args.maxTracingDistance != 0 && t > maxT))
+        {
+            break;
+        }
+
+        brx_float sampleSizeWorld = sampleSize * BRX_VCT_CLIPMAP_FINEST_VOXEL_SIZE;
+        brx_float rSampleSizeWorld = rcp(sampleSizeWorld);
+        minDistanceToBoundary -= sampleSizeWorld;
+
+        if (minDistanceToBoundary < 0)
+        {
+            break;
+        }
+
+        if (args.enableSceneBoundsCheck)
+        {
+            if (any((curPosition.xyz + sampleSizeWorld < g_VxgiAbstractTracingCB.SceneBoundaryLower.xyz)) || any((curPosition.xyz - sampleSizeWorld > g_VxgiAbstractTracingCB.SceneBoundaryUpper.xyz)))
+                break;
+        }
+
+        if (enable_ambient)
+        {
+            // Newton Leibniz theorem
+            // we assume the "transparency" is the same within each segment
+            brx_float ambient_factor = K(args.ambientAttenuationFactor, t);
+            cone_ambient += (ambient_factor - prev_ambient_factor) * transparency;
+            prev_ambient_factor = ambient_factor;
+        }
+
+        brx_float3 emittance;
+        brx_float alpha;
+        {
+            brx_float weight = saturate(minDistanceToBoundary * rSampleSizeWorld);
+            if (maxT > 0)
+                weight *= saturate((maxT - t) / tStep);
+
+            brx_float3 adjustedPosition = curPosition;
+
+            brx_float opacity;
+            bool anyEmittance;
+            VxgiSampleVoxelData(adjustedPosition, fLevel, direction, weight, true, opacity, emittance, anyEmittance);
+
+            // photon mapping: (1.0/(PI*r*r)) * brdf * DeltaPhi
+            //
+            // "brdf * DeltaPhi / area" stored in the voxel
+            //
+            // area is calculated by the following
+            // factorLow = pow(4, iLevel) * VxgiSqr(VCT_CLIPMAP_FINEST_VOXEL_SIZE)
+            // factorHigh = factorLow * 4
+            //
+            // uniform kernel
+            // square shape
+            // VxgiSqr(rSampleSizeWorld)
+            if (anyEmittance && enable_radiance)
+            {
+                emittance *= VxgiSqr(rSampleSizeWorld);
+            }
+
+            // tStep: axial distance
+            // sampleSize: diameter
+            //
+            // Beer's Law
+            // transmittance
+            // 1.0 - opacity = e^(-omega_t*sampleSize)
+            // 1.0 - correctedOpacity = e^(-omega_t*tStep)
+            //
+            // correctedOpacity = 1.0 - pow(1.0 - opacity, (tStep / sampleSize))
+            brx_float correctedOpacity = saturate(1.0 - pow(saturate(1.0 - opacity), (tStep / sampleSize)));
+
+            alpha = correctedOpacity;
+        }
+
+        if (enable_radiance)
+        {
+            // transparency: V_{k-1}
+            //
+            // emittance: premultipled alpha A_k*C_k
+            // when write // we multiply the opacity
+            //
+            cone_radiance += transparency * emittance;
+        }
+
+        // [Dunn 2014] [Alex Dunn. "Transparency (or Translucency) Rendering." NVIDIA GameWorks Blog 2014.](https://developer.nvidia.com/content/transparency-or-translucency-rendering)
+        // under operation
+        transparency *= (1.0 - alpha);
+
+        brx_branch if (transparency < INTERNAL_BRX_VCT_CONE_TRACING_TRANSPARENCY_THRESHOLD)
+        {
+            break;
+        }
+
+        t += tStep;
+        curPosition += tStep * BRX_VCT_CLIPMAP_FINEST_VOXEL_SIZE * direction;
+    }
+
+    if (enable_ambient)
+    {
+        // k(inf) = 0
+        cone_ambient += (0.0 - K(args.ambientAttenuationFactor, t)) * transparency;
+    }
+
+    VxgiConeTracingResults result;
+    result.radiance = cone_radiance;
+    result.ambient = saturate(cone_ambient);
+    result.finalOpacity = saturate(1.0f - transparency);
+    return result;
+}
+
+//////////////////APP CODE BOUNDARY/////////////
+
+bool IsInfOrNaN(brx_float x)
+{
+    uint exponent = asuint(x) & 0x7f800000;
+    return exponent == 0x7f800000;
+}
+
+bool IsInfOrNaN(brx_float4 v)
+{
+    return IsInfOrNaN(v.x) || IsInfOrNaN(v.y) || IsInfOrNaN(v.z) || IsInfOrNaN(v.w);
+}
+
+void AdjustConePosition(brx_float3 surfacePosition, brx_float minSampleSize, brx_float initialOffsetBias, brx_float initialOffsetDistanceFactor, brx_float Inv_DiffuseSoftness_Factor, brx_float perPixelOffset, brx_float3 N, brx_float Inv_NDotV_Factor, inout VxgiConeTracingArguments args)
+{
+    // Ray-Tracing-Gems: [Chapter 6: A Fast and Robust Method for Avoiding Self-Intersection](https://www.realtimerendering.com/raytracinggems/rtg/index.html)
+    // Ray-Tracing-Gems: [offset_ray](https://github.com/Apress/ray-tracing-gems/blob/master/Ch_06_A_Fast_and_Robust_Method_for_Avoiding_Self-Intersection/offset_ray.cu)
+    // PBR-BOOK-V3: [3.9.5 Robust Spawned Ray Origins](https://pbr-book.org/3ed-2018/Shapes/Managing_Rounding_Error#RobustSpawnedRayOrigins)
+    // PBRT-V3: [OffsetRayOrigin](https://github.com/mmp/pbrt-v3/blob/book/src/core/geometry.h#L1421)
+    // PBR-BOOK-V4: [6.8.6 Robust Spawned Ray Origins](https://pbr-book.org/4ed/Shapes/Managing_Rounding_Error#RobustSpawnedRayOrigins)
+    // PBRT-V4: [OffsetRayOrigin](https://github.com/mmp/pbrt-v4/blob/ci/src/pbrt/ray.h#L75)
+
+    brx_float initialOffset = minSampleSize * initialOffsetDistanceFactor + initialOffsetBias;
+
+    initialOffset += initialOffsetBias * Inv_NDotV_Factor;
+
+    initialOffset += perPixelOffset;
+
+    args.firstSampleT = initialOffset;
+    args.firstSamplePosition = surfacePosition + normalize(lerp(args.direction, N, Inv_DiffuseSoftness_Factor)) * (BRX_VCT_CLIPMAP_FINEST_VOXEL_SIZE * initialOffset);
+}
+
+brx_float InfNaNOutputGuard(brx_float x)
+{
+    return IsInfOrNaN(x) ? 0.f : x;
+}
+
+brx_float4 InfNaNOutputGuard(brx_float4 v)
+{
+    return brx_float4(
+        InfNaNOutputGuard(v.x),
+        InfNaNOutputGuard(v.y),
+        InfNaNOutputGuard(v.z),
+        InfNaNOutputGuard(v.w));
+}
+
+brx_float2 hammersley_2d(uint sample_index, uint sample_count)
+{
+    // PBR Book V3: ["7.4.1 Hammersley and Halton Sequences"](https://www.pbr-book.org/3ed-2018/Sampling_and_Reconstruction/The_Halton_Sampler#HammersleyandHaltonSequences)
+    // PBR Book V4: ["8.6.1 Hammersley and Halton Points"](https://pbr-book.org/4ed/Sampling_and_Reconstruction/Halton_Sampler#HammersleyandHaltonPoints)
+    // UE: [Hammersley](https://github.com/EpicGames/UnrealEngine/blob/4.27/Engine/Shaders/Private/MonteCarlo.ush#L34)
+    // U3D: [Hammersley2d](https://github.com/Unity-Technologies/Graphics/blob/v10.8.1/com.unity.render-pipelines.core/ShaderLibrary/Sampling/Hammersley.hlsl#L415)
+
+    const brx_float UINT32_MAX = 4294967296.0;
+
+    const brx_float xi_1 = brx_float(sample_index) / brx_float(sample_count);
+    const brx_float xi_2 = reversebits(sample_index) * (1.0 / UINT32_MAX);
+
+    return brx_float2(xi_1, xi_2);
+}
+
+#define INTERNAL_BRX_VCT_CONE_TRACING_MAXIMUM_CONE_COUNT 32
+
+// https://docs.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-variable-syntax
+// "in D3D11 the maximum size is 32kb"
+#define INTERNAL_BRX_VCT_CONE_TRACING_GROUP_SHARED_MEMORY_COUNT (INTERNAL_BRX_VCT_CONE_TRACING_MAXIMUM_CONE_COUNT / 2)
+brx_group_shared brx_float4 internal_brx_vct_reduction_group_shared_memory[INTERNAL_BRX_VCT_CONE_TRACING_GROUP_SHARED_MEMORY_COUNT];
+
+#define INTERNAL_BRX_VCT_CONE_TRACING_DIFFUSE_CONE_COUNT 24
+
+#define INTERNAL_BRX_VCT_CONE_TRACING_SPECULAR_CONE_COUNT 8
+
+#define INTERNAL_BRX_INVALID_GBUFFER_DEPTH 1.0
+
+brx_num_threads(INTERNAL_BRX_VCT_CONE_TRACING_MAXIMUM_CONE_COUNT, 1, 1)
+    brx_compute_shader_parameter_begin(main)
+        brx_compute_shader_parameter_in_group_id brx_compute_shader_parameter_split
+    brx_compute_shader_parameter_in_group_index
+    brx_compute_shader_parameter_end(main)
+{
+    brx_float g_screen_width = 1.0 / g_GBuffer.viewportSizeInv.x;
+    brx_float g_screen_height = 1.0 / g_GBuffer.viewportSizeInv.y;
+
+    brx_float4x4 g_inverse_view_transform = transpose(g_GBuffer.viewMatrixInv);
+    brx_float4x4 g_inverse_projection_transform = transpose(g_GBuffer.projMatrixInv);
+
+    brx_int reduction_index = brx_int(brx_group_index);
+
+    brx_float gbuffer_depth = brx_load_2d(g_gbuffer_depth, brx_int3(brx_group_id.xy, 0)).x;
+    brx_branch if (INTERNAL_BRX_INVALID_GBUFFER_DEPTH == gbuffer_depth)
+    {
+        brx_branch if (0 == reduction_index)
+        {
+            brx_store_2d(g_radiance_and_ambient, brx_int2(brx_group_id.xy), brx_float4(0.0, 0.0, 0.0, 0.0));
+        }
+        return;
+    }
+
+    brx_float3 reduction_thread_local_radiance;
+    brx_float reduction_thread_local_ambient;
+    brx_branch if (reduction_index < (brx_int(INTERNAL_BRX_VCT_CONE_TRACING_DIFFUSE_CONE_COUNT) + brx_int(INTERNAL_BRX_VCT_CONE_TRACING_SPECULAR_CONE_COUNT)))
+    {
+        brx_float3 surface_position_world_space;
+        {
+            brx_float2 uv = (brx_float2(brx_group_id.xy) + brx_float2(0.5, 0.5)) / brx_float2(g_screen_width, g_screen_height);
+
+            // brx_float position_depth = brx_uint_as_float(gbuffer_depth);
+            brx_float position_depth = gbuffer_depth;
+
+            brx_float3 position_ndc_space = brx_float3(uv * brx_float2(2.0, -2.0) + brx_float2(-1.0, 1.0), position_depth);
+
+            brx_float4 position_view_space_with_w = brx_mul(g_inverse_projection_transform, brx_float4(position_ndc_space, 1.0));
+
+            brx_float3 position_view_space = position_view_space_with_w.xyz / position_view_space_with_w.w;
+
+            brx_float3 position_world_space = brx_mul(g_inverse_view_transform, brx_float4(position_view_space, 1.0)).xyz;
+
+            surface_position_world_space = position_world_space;
+        }
+
+        brx_float3 shading_normal_world_space;
+        brx_float3 diffuse_color;
+        brx_float3 specular_color;
+        brx_float roughness;
+        {
+            brx_float4 base_color_and_metallic = brx_load_2d(g_gbuffer_base_color_and_metallic, brx_int3(brx_group_id.xy, 0));
+            brx_float4 normal_and_roughness = brx_load_2d(g_gbuffer_normal_and_roughness, brx_int3(brx_group_id.xy, 0));
+
+            shading_normal_world_space = normal_and_roughness.xyz;
+            roughness = normal_and_roughness.w;
+
+            brx_float3 base_color = base_color_and_metallic.xyz;
+            brx_float metallic = base_color_and_metallic.w;
+
+            // UE4: https://github.com/EpicGames/UnrealEngine/blob/4.21/Engine/Shaders/Private/MobileBasePassPixelShader.usf#L376
+            const brx_float dielectric_specular = 0.04;
+
+            specular_color = brx_clamp((dielectric_specular - dielectric_specular * metallic) + base_color * metallic, 0.0, 1.0);
+            diffuse_color = brx_clamp(base_color - base_color * metallic, 0.0, 1.0);
+        }
+
+        brx_float3 camera_ray_direction;
+        {
+            brx_float3 camera_ray_origin = brx_mul(g_inverse_view_transform, brx_float4(0.0, 0.0, 0.0, 1.0)).xyz;
+            camera_ray_direction = brx_normalize(surface_position_world_space - camera_ray_origin);
+        }
+
+        // flip back side normal
+        // ensure brx_dot(N, V) > 1E-5
+        // brx_branch if (brx_dot(shading_normal_world_space, camera_ray_direction) > 0.0)
+        // {
+        //     shading_normal_world_space = -shading_normal_world_space;
+        // }
+
+        brx_float3 N = shading_normal_world_space;
+
+        brx_float3 V = -camera_ray_direction;
+
+        brx_float3 T;
+        brx_float3 B;
+        {
+            // Since the clamped cosine is isotropic, the outgoing direction V is **usually** assumed to be in the XOZ plane.
+            // Actually the clamped cosine is **also** radially symmetric and the tangent direction is arbitrary.
+            // UE: [GetTangentBasis](https://github.com/EpicGames/UnrealEngine/blob/4.27/Engine/Shaders/Private/MonteCarlo.ush#L12)
+            // U3D: [GetLocalFrame](https://github.com/Unity-Technologies/Graphics/blob/v10.8.1/com.unity.render-pipelines.core/ShaderLibrary/CommonLighting.hlsl#L408)
+
+            // NOTE: "local_z" should be normalized.
+            brx_float3 local_z = N;
+
+            brx_float x = local_z.x;
+            brx_float y = local_z.y;
+            brx_float z = local_z.z;
+
+            brx_float sz = z >= 0.0 ? 1.0 : -1.0;
+            brx_float a = 1.0 / (sz + z);
+            brx_float ya = y * a;
+            brx_float b = x * ya;
+            brx_float c = x * sz;
+
+            brx_float3 local_x = brx_float3(c * x * a - 1, sz * b, c);
+            brx_float3 local_y = brx_float3(b, y * ya - sz, y);
+
+            T = local_x;
+            B = local_y;
+        }
+
+        brx_float3 samplePosition = surface_position_world_space;
+
+        brx_float minSampleSize = VxgiGetMinSampleSizeInVoxels(samplePosition);
+
+        brx_float3 L;
+        brx_float cone_factor;
+        brx_float tracingStep;
+        brx_float ambientAttenuationFactor;
+        brx_float Inv_DiffuseSoftness_Factor;
+        brx_float Inv_NDotV_Factor;
+        bool enable_ambient;
+        brx_float3 radiance_multiple;
+        brx_float ambient_multiple;
+        brx_branch if (reduction_index < brx_int(INTERNAL_BRX_VCT_CONE_TRACING_DIFFUSE_CONE_COUNT))
+        {
+            // brx_branch if (dot(N, V) > 1E-5)
+
+            brx_int cone_index = reduction_index;
+
+            brx_float3 omega_i = brx_normalized_clamped_cosine_sample_omega_i(hammersley_2d(cone_index, brx_int(INTERNAL_BRX_VCT_CONE_TRACING_DIFFUSE_CONE_COUNT)));
+
+            L = brx_normalize(T * omega_i.x + B * omega_i.y + N * omega_i.z);
+
+            brx_float NdotL = brx_max(0.0, omega_i.z);
+
+            brx_float pdf = brx_normalized_clamped_cosine_pdf_omega_i(NdotL);
+
+            // "20.4 Mipmap Filtered Samples" of GPU Gems 3
+            // UE: [SolidAngleSample](https://github.com/EpicGames/UnrealEngine/blob/4.27/Engine/Shaders/Private/ReflectionEnvironmentShaders.usf#L414)
+            // U3D: [omegaS](https://github.com/Unity-Technologies/Graphics/blob/v10.8.0/com.unity.render-pipelines.core/ShaderLibrary/ImageBasedLighting.hlsl#L500)
+            brx_float omega_s = (1.0 / brx_float(INTERNAL_BRX_VCT_CONE_TRACING_DIFFUSE_CONE_COUNT)) / pdf;
+
+            // Omega = 2 PI (1 - cos theta) // theta: cone half-angle
+            brx_float cone_cos_theta = 1.0 - brx_min(omega_s / (2.0 * BRX_M_PI), 1.0);
+            brx_float cone_tan_theta = brx_sqrt(brx_max(0.0, 1.0 - cone_cos_theta * cone_cos_theta)) / brx_max(cone_cos_theta, 1E-5);
+            cone_factor = cone_tan_theta * 2.0;
+
+            tracingStep = 0.5;
+
+            const brx_float ambientRange = 128;
+            const brx_float AmbientDistanceDarkening = -0.25;
+            ambientAttenuationFactor = 2.3 * BRX_VCT_CLIPMAP_FINEST_VOXEL_SIZE / max(BRX_VCT_CLIPMAP_FINEST_VOXEL_SIZE, ambientRange) * pow(minSampleSize, AmbientDistanceDarkening);
+
+            const brx_float DiffuseSoftness = 0.5;
+            Inv_DiffuseSoftness_Factor = 1.0 - DiffuseSoftness;
+
+            Inv_NDotV_Factor = 0.0;
+
+            enable_ambient = true;
+
+            // -------
+            brx_float3 rho = diffuse_color;
+
+            radiance_multiple = (1.0 / brx_float(INTERNAL_BRX_VCT_CONE_TRACING_DIFFUSE_CONE_COUNT)) * brx_normalized_clamped_cosine_throughput(rho);
+
+            ambient_multiple = (1.0 / brx_float(INTERNAL_BRX_VCT_CONE_TRACING_DIFFUSE_CONE_COUNT)) * brx_normalized_clamped_cosine_throughput(brx_float3(1.0, 1.0, 1.0)).x;
+        }
+        else
+        {
+            // brx_branch if (brx_dot(N, V) > 1E-5)
+
+            brx_int cone_index = reduction_index - brx_int(INTERNAL_BRX_VCT_CONE_TRACING_DIFFUSE_CONE_COUNT);
+
+            // Prevent the roughness to be zero
+            // https://github.com/EpicGames/UnrealEngine/blob/4.27/Engine/Shaders/Private/CapsuleLightIntegrate.ush#L94
+            const brx_float cvar_global_min_roughness_override = 0.02;
+            roughness = brx_max(cvar_global_min_roughness_override, roughness);
+
+            // Real-Time Rendering Fourth Edition / 9.8.1 Normal Distribution Functions: "In the Disney principled shading model, Burley[214] exposes the roughness control to users as g = r2, where r is the user-interface roughness parameter value between 0 and 1."
+            brx_float alpha = roughness * roughness;
+
+            // Prevent the NdotV to be zero
+            // https://github.com/EpicGames/UnrealEngine/blob/4.27/Engine/Shaders/Private/BRDF.ush#L34
+            brx_float3 omega_o = brx_normalize(brx_float3(brx_dot(V, T), brx_dot(V, B), brx_max(1e-5, brx_dot(V, N))));
+
+            brx_float3 omega_h = brx_trowbridge_reitz_sample_omega_h(hammersley_2d(cone_index, brx_int(INTERNAL_BRX_VCT_CONE_TRACING_SPECULAR_CONE_COUNT)), alpha, omega_o);
+
+            brx_float3 H = normalize(T * omega_h.x + B * omega_h.y + N * omega_h.z);
+
+            L = reflect(-V, H);
+
+            brx_float NdotV = brx_max(0.0, omega_o.z);
+
+            brx_float NdotH = brx_max(0.0, omega_h.z);
+
+            brx_float NdotL = brx_max(0.0, brx_dot(N, L));
+
+            brx_float VdotH = brx_max(0.0, brx_dot(omega_o, omega_h));
+
+            brx_float pdf = brx_trowbridge_reitz_pdf_omega_i(alpha, NdotV, NdotH);
+
+            // "20.4 Mipmap Filtered Samples" of GPU Gems 3
+            // UE: [SolidAngleSample](https://github.com/EpicGames/UnrealEngine/blob/4.27/Engine/Shaders/Private/ReflectionEnvironmentShaders.usf#L414)
+            // U3D: [omegaS](https://github.com/Unity-Technologies/Graphics/blob/v10.8.0/com.unity.render-pipelines.core/ShaderLibrary/ImageBasedLighting.hlsl#L500)
+            brx_float omega_s = (1.0 / brx_float(INTERNAL_BRX_VCT_CONE_TRACING_SPECULAR_CONE_COUNT)) / pdf;
+
+            // Omega = 2 PI (1 - cos theta) // theta: cone half-angle
+            brx_float cone_cos_theta = 1.0 - brx_min(omega_s / (2.0 * BRX_M_PI), 1.0);
+            brx_float cone_tan_theta = brx_sqrt(brx_max(0.0, 1.0 - cone_cos_theta * cone_cos_theta)) / brx_max(cone_cos_theta, 1E-5);
+            cone_factor = cone_tan_theta * 2.0;
+
+            // TODO:
+            // cone_factor = min(max(0.001, cone_factor), 1.0);
+
+            tracingStep = 1.0;
+
+            ambientAttenuationFactor = 0.0;
+
+            Inv_DiffuseSoftness_Factor = 0.0;
+
+            const brx_float coplanarOffsetFactor = 5;
+            Inv_NDotV_Factor = pow(saturate(1.0 - NdotV), 4.0) * coplanarOffsetFactor;
+
+            enable_ambient = false;
+
+            // -------
+
+            brx_float3 f0 = specular_color;
+            const brx_float3 f90 = brx_float3(1.0, 1.0, 1.0);
+
+            radiance_multiple = (1.0 / brx_float(INTERNAL_BRX_VCT_CONE_TRACING_SPECULAR_CONE_COUNT)) * brx_trowbridge_reitz_throughput(alpha, NdotL, f0, f90, VdotH);
+
+            ambient_multiple = 0.0;
+        }
+
+        VxgiConeTracingArguments args = VxgiDefaultConeTracingArguments();
+        args.direction = L;
+        args.coneFactor = cone_factor;
+        args.tracingStep = tracingStep;
+        args.enableSceneBoundsCheck = true;
+        args.ambientAttenuationFactor = ambientAttenuationFactor;
+
+        const brx_float PerPixelOffsetScale = 1.0;
+        brx_float perPixelOffset = 0.5 * PerPixelOffsetScale * minSampleSize * tracingStep;
+
+        const brx_float initialOffsetBias = 2.0;
+        const brx_float initialOffsetDistanceFactor = 1.0;
+        AdjustConePosition(samplePosition, minSampleSize, initialOffsetBias, initialOffsetDistanceFactor, Inv_DiffuseSoftness_Factor, perPixelOffset, N, Inv_NDotV_Factor, args);
+
+        VxgiConeTracingResults cone = VxgiTraceCone(args, true, enable_ambient);
+        brx_float3 L_i = cone.radiance;
+        // L_i += (1.0 - cone.finalOpacity) * environment_lighting_radiance
+        brx_float V_i = cone.ambient;
+
+        reduction_thread_local_radiance = L_i * radiance_multiple;
+        reduction_thread_local_ambient = V_i * ambient_multiple;
+    }
+    else
+    {
+        reduction_thread_local_radiance = brx_float3(0.0, 0.0, 0.0);
+        reduction_thread_local_ambient = 0.0;
+    }
+
+    brx_float4 reduction_thread_local = brx_float4(reduction_thread_local_radiance, reduction_thread_local_ambient);
+
+    // Parallel Reduction
+    brx_float4 reduction_group_total;
+    {
+
+        // Half of the group shared memory can be saved by the following method:
+        // Half threads store the local values into the group shared memory, and the other threads read back these values from the group shared memory and reduce them with their local values.
+
+        brx_branch if (reduction_index >= INTERNAL_BRX_VCT_CONE_TRACING_GROUP_SHARED_MEMORY_COUNT && reduction_index < (INTERNAL_BRX_VCT_CONE_TRACING_GROUP_SHARED_MEMORY_COUNT * 2))
+        {
+            brx_int group_shared_memory_index = reduction_index - INTERNAL_BRX_VCT_CONE_TRACING_GROUP_SHARED_MEMORY_COUNT;
+            internal_brx_vct_reduction_group_shared_memory[group_shared_memory_index] = reduction_thread_local;
+        }
+
+        brx_group_memory_barrier_with_group_sync();
+
+        brx_branch if (reduction_index < INTERNAL_BRX_VCT_CONE_TRACING_GROUP_SHARED_MEMORY_COUNT)
+        {
+            brx_int group_shared_memory_index = reduction_index;
+            internal_brx_vct_reduction_group_shared_memory[group_shared_memory_index] = reduction_thread_local + internal_brx_vct_reduction_group_shared_memory[group_shared_memory_index];
+        }
+
+#if 1
+        brx_unroll for (brx_int k = (INTERNAL_BRX_VCT_CONE_TRACING_GROUP_SHARED_MEMORY_COUNT / 2); k >= 1; k /= 2)
+        {
+            brx_group_memory_barrier_with_group_sync();
+
+            brx_branch if (reduction_index < k)
+            {
+                brx_int group_shared_memory_index = reduction_index;
+                internal_brx_vct_reduction_group_shared_memory[group_shared_memory_index] = internal_brx_vct_reduction_group_shared_memory[group_shared_memory_index] + internal_brx_vct_reduction_group_shared_memory[group_shared_memory_index + k];
+            }
+        }
+#else
+        brx_unroll for (brx_int k = brx_firstbithigh(INTERNAL_BRX_VCT_CONE_TRACING_GROUP_SHARED_MEMORY_COUNT / 2); k >= 0; --k)
+        {
+            brx_group_memory_barrier_with_group_sync();
+
+            brx_branch if (reduction_index < (1u << k))
+            {
+                brx_int group_shared_memory_index = reduction_index;
+                internal_brx_vct_reduction_group_shared_memory[group_shared_memory_index] = internal_brx_vct_reduction_group_shared_memory[group_shared_memory_index] + internal_brx_vct_reduction_group_shared_memory[group_shared_memory_index + (1u << k)];
+            }
+        }
+#endif
+
+        brx_group_memory_barrier_with_group_sync();
+
+        // brx_branch if (0 == reduction_index)
+        {
+            reduction_group_total = internal_brx_vct_reduction_group_shared_memory[0];
+        }
+    }
+
+    brx_branch if (0 == reduction_index)
+    {
+        brx_float4 reduction_group_total_radiance_and_ambient = reduction_group_total;
+
+#if 0
+                if (g_VxgiBuiltinTracingCB.TemporalReprojectionWeights.x > 0)
+                {
+                    ViewSampleParameters reprojectionParams = PrepareViewSample(gbufferSample, g_VxgiBuiltinTracingCB.ViewIndex, true);
+                    brx_float4 reprojectedColor = SampleViewTexture(reprojectionParams, t_PrevSpecular);
+
+                    brx_float4 result = brx_float4(radiance, finalOpacity) * (1 - reprojectionParams.totalWeight * g_VxgiBuiltinTracingCB.TemporalReprojectionWeights.x) + reprojectedColor.rgba * g_VxgiBuiltinTracingCB.TemporalReprojectionWeights.x;
+
+                    radiance = result.rgb;
+                    finalOpacity = result.a;
+                }
+#endif
+
+        brx_float4 radiance_and_ambient = reduction_group_total_radiance_and_ambient;
+        radiance_and_ambient = InfNaNOutputGuard(radiance_and_ambient);
+
+        brx_store_2d(g_radiance_and_ambient, brx_int2(brx_group_id.xy), radiance_and_ambient);
+    }
+}
+
+#endif
